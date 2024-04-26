@@ -72,6 +72,13 @@ Before we do anything, there are just two things you need to configure on the cl
     SUPABASE_ANON_KEY=YOUR_SUPABASE_API_KEY
     ```
 
+### Install dependencies
+In order to be able to run our example, we need to install all dependencies:
+
+```
+npm install
+```
+
 ### Meemaw specific code
 We will check what happens when you click on the button to send an ETH transaction.
 
