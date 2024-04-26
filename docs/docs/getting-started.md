@@ -58,7 +58,7 @@ If it does not work as expected, join us on Discord! We will happily help get yo
 
 ## Run the example
 
-Before we actually run the example, I suggest we go through the code together. In particular, we'll look at what is specific to Meemaw.
+Let's run the example a first time, then we'll go through part of the code together to understand how the Meemaw part works.
 
 ### Configure your App
 Before we do anything, there are just two things you need to configure on the client side: 
@@ -79,7 +79,34 @@ In order to be able to run our example, we need to install all dependencies:
 npm install
 ```
 
-### Meemaw specific code
+### Start the app
+
+Cool so you've got the source code downloaded on your machine and the project is configured and ready to be launched. Now is finally time to run your app! Open a new terminal and make sure you're in the client directory then run this command:
+
+```
+npm run dev
+```
+
+Boom ! 🎉
+
+You should now see something like this in your terminal, amongst other things :
+
+```
+Local:        http://localhost:3000
+```
+
+Just visit [http://localhost:3000](http://localhost:3000) and you should see our app 🥳
+
+### Send your first transaction
+When you open the example for the first time as a "fresh" user, **you will have to sign up on Supabase**. Simply click on "I don't have an account yet", and sign up using your email and password. Note that an email will be sent to confirm your registration. Once you've confirmed the registration, you should be logged in our example app. If this is not the case, simply log in.
+
+The next step is to **create a wallet** for this user. Just click on "Generate Wallet", and everything will happen magically behind the scenes. A wallet will be generated in concert between the client and the server through the MPC-TSS process. Note that there is an obvious potential improvement here: you could automatically create a wallet at sign up!
+
+Once the wallet is created, we have one last step we need to take before being able to send a transaction: **add some funds to our wallet**. Otherwise, obviously, there will be nothing to send... One way to get some funds on the Sepolia network is to use a faucet like this one: https://sepolia-faucet.pk910.de/ Just enter the ETH address of your new wallet and "start mining".
+
+Excellent, now is finally time to **send our first transaction!** Wait the few seconds necessary for funds to arrive in your new wallet, then send the transaction to whatever wallet you wish to make slightly richer 😁 Again, everything will happen magically behind the scenes in concert between the client and the server. The transaction will be signed through the MPC-TSS process then broadcast on the blockchain.
+
+## Understand how it works
 We will check what happens when you click on the button to send an ETH transaction.
 
 The first step is to get a wallet for the given user. If it's the first time the user tries to do anything that requires a wallet, the Meemaw SDK will automatically [create a new wallet](/docs/how-does-it-work) for that user. Otherwise, it will just [recover the wallet](/docs/how-does-it-work) from storage. It's as easy as instantiating Meemaw with the server URL then calling `GetWallet` with the Supabase JWT :
@@ -123,34 +150,6 @@ const txReceipt = await web3.eth.sendSignedTransaction(signedTransaction);
 ```
 
 That's it! 
-
-### Start the app
-
-Cool so you've got the source code downloaded on your machine and you understand it. Now is finally time to run your app! Open a new terminal and make sure you're in the client directory then run this command:
-
-```
-npm run dev
-```
-
-Boom ! 🎉
-
-You should now see something like this in your terminal, amongst other things :
-
-```
-Local:        http://localhost:3000
-```
-
-Just visit [http://localhost:3000](http://localhost:3000) and you should see our app 🥳
-
-### Send your first transaction
-When you open the example for the first time as a "fresh" user, **you will have to sign up on Supabase**. Simply click on "I don't have an account yet", and sign up using your email and password. Note that an email will be sent to confirm your registration. Once you've confirmed the registration, you should be logged in our example app. If this is not the case, simply log in.
-
-The next step is to **create a wallet** for this user. Just click on "Generate Wallet", and everything will happen magically behind the scenes. A wallet will be generated in concert between the client and the server through the MPC-TSS process. Note that there is an obvious potential improvement here: you could automatically create a wallet at sign up!
-
-Once the wallet is created, we have one last step we need to take before being able to send a transaction: **add some funds to our wallet**. Otherwise, obviously, there will be nothing to send... One way to get some funds on the Sepolia network is to use a faucet like this one: https://sepolia-faucet.pk910.de/ Just enter the ETH address of your new wallet and "start mining".
-
-Excellent, now is finally time to **send our first transaction!** Wait the few seconds necessary for funds to arrive in your new wallet, then send the transaction to whatever wallet you wish to make slightly richer 😁 Again, everything will happen magically behind the scenes in concert between the client and the server. The transaction will be signed through the MPC-TSS process then broadcast on the blockchain.
-
 
 ## Next steps
 
