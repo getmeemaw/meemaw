@@ -64,13 +64,13 @@ jobs:
       - name: Update version in package.json
         run: |
           VERSION=${GITHUB_REF#refs/tags/} 
-          cd client/web/package/
+          cd client/web/meemaw-js/
           npm version $VERSION --allow-same-version --no-git-tag-version
         # The first line removes 'refs/tags/' from the ref to get the tag name
 
       - name: Publish
         run: |
-          cd client/web/package/
+          cd client/web/meemaw-js/
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
@@ -143,7 +143,7 @@ jobs:
           path: ./meemaw-ios
 
       - name: Copy SDK files
-        run: cp -r client/ios/MeemawSDK/* meemaw-ios/
+        run: cp -r client/ios/meemaw-ios/* meemaw-ios/
 
       - name: Commit and push
         run: |
