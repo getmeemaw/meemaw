@@ -1,0 +1,43 @@
+name: docs
+on:
+  push:
+    paths:
+      - 'docs/**'
+    branches:
+      - main  # or your default branch
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install and Build
+      run: |
+        cd docs
+        npm install
+        npm run build
+
+    - name: Remove index.html
+      run: rm docs/build/index.html
+
+    - name: Checkout deploy repository
+      uses: actions/checkout@v4
+      with:
+        repository: getmeemaw/meemaw-dist
+        token: ${{ secrets.PERSONAL_TOKEN }}
+        path: ./meemaw-dist
+
+    - name: Copy build files
+      run: cp -r docs/build/* meemaw-dist/
+
+    - name: Commit and push
+      run: |
+        cd meemaw-dist
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add .
+        git commit -m "Update build files"
+        git push

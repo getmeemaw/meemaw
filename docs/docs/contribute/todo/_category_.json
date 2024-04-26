@@ -1,0 +1,8 @@
+{
+  "label": "Things to do",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "Here are the things you can do to help."
+  }
+}

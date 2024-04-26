@@ -1,0 +1,27 @@
+{
+  "name": "@getmeemaw/meemaw-js",
+  "version": "0.1.0",
+  "description": "Web SDK of Meemaw",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/getmeemaw/meemaw.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wallet",
+    "mpc",
+    "tss",
+    "trustless"
+  ],
+  "author": "Meemaw",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "browser": "./index.js",
+      "default": "./index.js"
+    }
+  }
+}

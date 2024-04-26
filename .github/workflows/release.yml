@@ -1,0 +1,160 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*" # Will trigger only if tag is pushed matching pattern `v*` (Eg: `v0.1.0`)
+
+permissions: write-all
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Dependencies
+        run: go get -t -u ./...
+
+      - name: Tidy
+        run: go mod tidy
+
+      - name: Login to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Docker Version
+        run: |
+          docker version
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          version: latest
+          args: release --parallelism 1 --clean --skip=validate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update version in package.json
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/} 
+          cd client/web/package/
+          npm version $VERSION --allow-same-version --no-git-tag-version
+        # The first line removes 'refs/tags/' from the ref to get the tag name
+
+      - name: Publish
+        run: |
+          cd client/web/package/
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
+      # note : wasm is generated through go generate in handlers.go with goreleaser, and served from server => not included in npm package
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Dependencies
+        run: go get -t -u ./...
+
+      - name: Tidy
+        run: go mod tidy
+
+      - name: Install gomobile
+        run: go install golang.org/x/mobile/cmd/gomobile
+
+      - name: Init gomobile
+        run: gomobile init
+
+      - name: Build xcframework
+        run: |
+          cd client/ios/ && gomobile bind -target ios,iossimulator,macos -o Tsslib.xcframework
+      
+      - name: Zip xcframework
+        run: |
+          cd client/ios/ && zip -r Tsslib.xcframework.zip Tsslib.xcframework
+      
+      - name: Get release
+        id: get_release
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const tag_name = context.ref.replace('refs/tags/', '')
+            const release = await github.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag: tag_name
+            })
+            return release.data.upload_url
+          result-encoding: string
+      
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_release.outputs.result }}
+          asset_path: ./client/ios/Tsslib.xcframework.zip
+          asset_name: Tsslib.xcframework.zip
+          asset_content_type: application/zip
+      
+      - name: Checkout iOS SDK repository
+        uses: actions/checkout@v4
+        with:
+          repository: getmeemaw/meemaw-ios
+          token: ${{ secrets.IOS_PERSONAL_TOKEN }}
+          path: ./meemaw-ios
+
+      - name: Copy SDK files
+        run: cp -r client/ios/MeemawSDK/* meemaw-ios/
+
+      - name: Commit and push
+        run: |
+          cd meemaw-ios
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Update SDK"
+          git push
+      
+      # zip & upload to github as github release
+
+      # create & publish swift package
+      # => copy package to it's own repo ! That's how it is "published". Store xcframework there as well? Or rather not so that the SDK repo can be apache-2.0 ?

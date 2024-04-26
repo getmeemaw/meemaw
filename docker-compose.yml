@@ -1,0 +1,48 @@
+# NOTE: This docker-compose.yml is just meant to get you started.
+# It is not intented to be run in production as is.
+# Please follow our server security guidelines : https://getmeemaw.com/docs/security/server
+
+version: "3.7"
+
+services:
+  db:
+    image: postgres:13
+    restart: unless-stopped
+    ports:
+      - "9432:5432"
+    networks:
+      - meemaw
+    environment:
+      - POSTGRES_PASSWORD=meemaw
+      - POSTGRES_USER=meemaw
+      - POSTGRES_DB=meemaw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meemaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    container_name: meemaw_db
+    volumes:
+      - type: volume
+        source: meemaw-data
+        target: /var/lib/postgresql/data
+
+  app:
+    # image: ghcr.io/getmeemaw/meemaw:latest
+    image: meemaw
+    restart: unless-stopped
+    ports:
+      - "8421:8421"
+    networks:
+      - meemaw
+    container_name: meemaw_app
+    depends_on:
+      - db
+    volumes:
+      - ./config.toml:/config.toml
+
+networks:
+  meemaw:
+
+volumes:
+  meemaw-data:
