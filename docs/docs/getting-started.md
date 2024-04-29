@@ -14,13 +14,13 @@ Also, this is just scratching the surface, you can find a whole lot more in the 
 
 ## Let's get started
 
-Ok let's start with a simple yet complete example. We will deploy the server with Docker, link it with a Supabase instance for authentication, and use our Web SDK to deploy a trustless wallet for each of your users.
+Ok let's start with a simple yet complete example. We will deploy the server with [Docker](https://www.docker.com/), link it with a [Supabase](https://supabase.com/) instance for authentication, and use our Web SDK to deploy a trustless wallet for each of your users.
 
 ## Requirements
 
 You need:
 
-* a machine (VPS, dedicated server, your computer, etc) with [NodeJS](https://nodejs.org/), [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+* a machine (VPS, dedicated server, your computer, etc) with [NodeJS v>=20](https://nodejs.org/), [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
 * access to a JSON-RPC API to ensure your application can access the Sepolia blockchain ([Alchemy](https://www.alchemy.com/), [Infura](https://www.infura.io/), etc)
 * a [Supabase](https://supabase.com/) project and your `public API key` and `URL` handy (the free tier is fine)
 * familiarity with basic Web3 concepts (i.e. you understand what is required to send a transaction)
@@ -31,19 +31,21 @@ Also, let's download a working example so that we can get our feet wet super eas
 git clone https://github.com/getmeemaw/example-js.git
 ```
 
+Once the example is downloaded, you can already `cd example-js` to be ready for the next steps.
+
 We will explain the Meemaw specific parts of this example in this page. The rest is typical React and some [Supabase specific stuff](https://supabase.com/docs/guides/auth/auth-helpers/auth-ui).
 
 ## Deploy server
 
 You will learn a bit later how to [configure Meemaw](/docs/server#config) and modify the [Docker compose configuration](/docs/server#docker-compose) for your specific needs, but if you downloaded the example above, **there is just one thing you need to do**: in `server/config.toml`, update `supabaseUrl` and `supabaseApiKey` with yours.
 
-Then you can actually deploy the server. Make sure you're in the server directory and that Docker is running, then just start the server with:
+Then you can actually deploy the server. **Make sure you're in the server directory and that Docker is running**, then just start the server with:
 
 ```
 docker compose up
 ```
 
-You should be greeted with something like this:
+You should be greeted with a bunch of text, including something like this:
 ```
 meemaw_app  | 2042/05/04 11:59:59 Logging enabled
 meemaw_app  | 2042/05/04 11:59:59 Connected to DB
@@ -66,14 +68,10 @@ Before we do anything, there are just two things you need to configure on the cl
     ```javascript title="client/src/app/tx.jsx"
     const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8421/rpc"));
     ```
-- your Supabase URL and API Key. Create a `.env.local` file in the `client/` folder with the following lines:
-    ```toml title=".env.local"
-    SUPABASE_URL=YOUR_SUPABASE_URL
-    SUPABASE_ANON_KEY=YOUR_SUPABASE_API_KEY
-    ```
+- your Supabase URL and API Key. It's not the same step as above, we're configuring the client this time 😊 Modify `.env.local` in the `client/` folder, replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_API_KEY` with yours.
 
 ### Install dependencies
-In order to be able to run our example, we need to install all dependencies:
+Cool so you've got the source code downloaded on your machine and the project is configured and ready to be launched. Just before we can run our example, we need to install all dependencies. **Open a new terminal and make sure you're in the client directory** then run this command:
 
 ```
 npm install
@@ -81,7 +79,7 @@ npm install
 
 ### Start the app
 
-Cool so you've got the source code downloaded on your machine and the project is configured and ready to be launched. Now is finally time to run your app! Open a new terminal and make sure you're in the client directory then run this command:
+Now is finally show time:
 
 ```
 npm run dev
@@ -102,9 +100,11 @@ When you open the example for the first time as a "fresh" user, **you will have 
 
 The next step is to **create a wallet** for this user. Just click on "Generate Wallet", and everything will happen magically behind the scenes. A wallet will be generated in concert between the client and the server through the MPC-TSS process. Note that there is an obvious potential improvement here: you could automatically create a wallet at sign up!
 
-Once the wallet is created, we have one last step we need to take before being able to send a transaction: **add some funds to our wallet**. Otherwise, obviously, there will be nothing to send... One way to get some funds on the Sepolia network is to use a faucet like this one: https://sepolia-faucet.pk910.de/ Just enter the ETH address of your new wallet and "start mining".
+Once the wallet is created, we have one last step we need to take before being able to send a transaction: **add some funds to our wallet**. Otherwise, obviously, there will be nothing to send... One way to get some funds on the Sepolia network is to use a faucet like this one: https://sepolia-faucet.pk910.de/ Just enter the ETH address of your new wallet and "start mining". It will take some time, make sure you let it run until you have the minimum required amount, but not more (we don't need much).
 
 Excellent, now is finally time to **send our first transaction!** Wait the few seconds necessary for funds to arrive in your new wallet, then send the transaction to whatever wallet you wish to make slightly richer 😁 Again, everything will happen magically behind the scenes in concert between the client and the server. The transaction will be signed through the MPC-TSS process then broadcast on the blockchain.
+
+Congratulations, you've made your first transaction using Meemaw 🎉
 
 ## Understand how it works
 We will check what happens when you click on the button to send an ETH transaction.
