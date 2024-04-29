@@ -13,6 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// Helpers allowing for easy transactions through the SDKs
+
+////////////////
+/// ETHEREUM ///
+////////////////
+
 type EthereumTx struct {
 	tx     *types.Transaction
 	signer *types.EIP155Signer

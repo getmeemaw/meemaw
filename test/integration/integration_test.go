@@ -17,6 +17,9 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// This file is the entry point for all tests in this directory.
+// All integration tests requiring the interaction of multiple components should live here, all unit tests should live inside each component's directory.
+
 // For Github Actions : check https://github.com/ory/dockertest "Running Dockertest Using GitHub Actions"
 
 var db *sql.DB
