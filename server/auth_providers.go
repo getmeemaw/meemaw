@@ -50,9 +50,10 @@ func (server *Server) Supabase(jwt string) (string, error) {
 
 	// Check http code from Supabase
 	if resp.StatusCode != 200 {
+		log.Printf("Supabase response not 200: %+v", resp)
 		if resp.StatusCode == 400 {
 			return "", &types.ErrBadRequest{}
-		} else if resp.StatusCode == 401 {
+		} else if resp.StatusCode == 401 || resp.StatusCode == 403 {
 			return "", &types.ErrUnauthorized{}
 		} else if resp.StatusCode == 404 {
 			return "", &types.ErrNotFound{}
