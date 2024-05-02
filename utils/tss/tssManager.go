@@ -125,7 +125,7 @@ func (p *ServerDkg) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, fmt.Errorf("Could not get server dkg results")
+		return nil, fmt.Errorf("could not get server dkg results")
 	}
 
 	pubkey := Pubkey{
@@ -193,7 +193,7 @@ func (p *ClientDkg) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, fmt.Errorf("Could not get client dkg results")
+		return nil, fmt.Errorf("could not get client dkg results")
 	}
 
 	pubkey := Pubkey{
@@ -286,7 +286,7 @@ func (p *ServerSigner) Process() (*Signature, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, fmt.Errorf("Could not get server signer results")
+		return nil, fmt.Errorf("could not get server signer results")
 	}
 
 	publicKeyECDSA := p.service.pubkey.GetECDSA()
@@ -359,7 +359,7 @@ func (p *ClientSigner) Process() (*Signature, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, fmt.Errorf("Could not get client signer results")
+		return nil, fmt.Errorf("could not get client signer results")
 	}
 
 	publicKeyECDSA := p.service.pubkey.GetECDSA()
@@ -422,52 +422,62 @@ func (p *ClientSigner) Test() []byte {
 func Receive(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 	// defer wg.Done()
 	for {
-		// log.Println("starting wsjson read")
-		var v string
-		err := wsjson.Read(ctx, c, &v)
-		if err != nil {
-			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
-				log.Println("error reading json in receive:", err)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// log.Println("starting wsjson read")
+			var v string
+			err := wsjson.Read(ctx, c, &v)
+			if err != nil {
+				if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+					log.Println("error reading json in receive:", err)
+				}
+				return
 			}
-			return
-		}
-		// log.Printf("Received: %v\n", v)
+			log.Printf("Received: %v\n", v)
 
-		byteString, err := hex.DecodeString(v)
-		if err != nil {
-			log.Println("error decoding hex:", err)
-			return
-		}
+			byteString, err := hex.DecodeString(v)
+			if err != nil {
+				log.Println("error decoding hex:", err)
+				return
+			}
 
-		tss.HandleMessage(byteString)
+			tss.HandleMessage(byteString)
+		}
 	}
 }
 
 func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 	// defer wg.Done()
 	for {
-		msg, err := tss.GetNextMessageToSend()
-		if err != nil {
-			log.Println("error getting next message:", err)
+		select {
+		case <-ctx.Done():
 			return
-		}
-
-		encodedMsg := hex.EncodeToString(msg)
-
-		// log.Println("trying send, next encoded message to send:", encodedMsg)
-
-		if msg != nil {
-			// log.Println("trying to send message:", encodedMsg)
-			err := wsjson.Write(ctx, c, encodedMsg)
+		default:
+			msg, err := tss.GetNextMessageToSend()
 			if err != nil {
-				if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
-					log.Println("error writing json through websocket:", err)
-				}
+				log.Println("error getting next message:", err)
 				return
 			}
-		}
 
-		time.Sleep(10 * time.Millisecond)
+			encodedMsg := hex.EncodeToString(msg)
+
+			log.Println("trying send, next encoded message to send:", encodedMsg)
+
+			if msg != nil {
+				// log.Println("trying to send message:", encodedMsg)
+				err := wsjson.Write(ctx, c, encodedMsg)
+				if err != nil {
+					if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+						log.Println("error writing json through websocket:", err)
+					}
+					return
+				}
+			}
+
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 }
 
@@ -572,7 +582,7 @@ func GenerateSignature(r, s *big.Int, pubkey *Pubkey, msg []byte) ([]byte, error
 		sLen = (s.BitLen() + 7) / 8
 	}
 	if rLen == 0 || rLen > 32 || sLen == 0 || sLen > 32 {
-		return nil, fmt.Errorf("Google KMS asymmetric signature with %d-byte r and %d-byte s denied on size \n", rLen, sLen)
+		return nil, fmt.Errorf("google KMS asymmetric signature with %d-byte r and %d-byte s denied on size", rLen, sLen)
 	}
 
 	// Need uncompressed signature with "recovery ID" at end:
@@ -625,7 +635,7 @@ func GenerateSignature(r, s *big.Int, pubkey *Pubkey, msg []byte) ([]byte, error
 	// log.Println("verified ECDSA newSignature?", ok)
 
 	if !ok {
-		return nil, fmt.Errorf("Signature does not ECDSA verify.")
+		return nil, fmt.Errorf("signature does not ECDSA verify")
 	}
 
 	// ok = crypto.VerifySignature(pubkey.GetBytes(), msg, newSignature[:64])
