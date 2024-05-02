@@ -435,7 +435,7 @@ func Receive(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 				}
 				return
 			}
-			log.Printf("Received: %v\n", v)
+			// log.Printf("Received: %v\n", v)
 
 			byteString, err := hex.DecodeString(v)
 			if err != nil {
@@ -463,7 +463,7 @@ func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 
 			encodedMsg := hex.EncodeToString(msg)
 
-			log.Println("trying send, next encoded message to send:", encodedMsg)
+			// log.Println("trying send, next encoded message to send:", encodedMsg)
 
 			if msg != nil {
 				// log.Println("trying to send message:", encodedMsg)
