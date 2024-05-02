@@ -23,6 +23,6 @@ let package = Package(
         .binaryTarget(
             name: "Tsslib",
             url: "https://github.com/getmeemaw/meemaw/releases/download/v0.1.1/Tsslib.xcframework.zip",
-            checksum: "8a1acdd534a99753da947d5d806d68799ab9115bf3af8d601be20e2b81402740")
+            checksum: "b81a5a32d83403b125bdc4f6a0dbc53f2ba32eb26d1fc56f32eb147cae0a8d41")
     ]
 )
