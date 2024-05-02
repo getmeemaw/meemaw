@@ -148,7 +148,7 @@ func (p *serviceSigner) Process() {
 func (p *serviceSigner) OnStateChanged(oldState types.MainState, newState types.MainState) {
 	if newState == types.StateFailed {
 		log.Println("Signing failed", "old", oldState.String(), "new", newState.String())
-		p.err = fmt.Errorf("Signing failed")
+		p.err = fmt.Errorf("signing failed")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {

@@ -82,7 +82,7 @@ func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 		if el.peerID == peerID && len(nextMsg) == 0 {
 			msg, ok := el.message.(proto.Message)
 			if !ok {
-				return nil, fmt.Errorf("Invalid proto message")
+				return nil, fmt.Errorf("invalid proto message")
 			}
 
 			// log.Printf("next message to send: %+v\n", msg)
@@ -117,6 +117,6 @@ func (p *PeerManager) HandleMessage(msg []byte) error {
 	return p.handleMessageFunction(msg)
 }
 
-func remove(slice []Message, s int) []Message {
-	return append(slice[:s], slice[s+1:]...)
-}
+// func remove(slice []Message, s int) []Message {
+// 	return append(slice[:s], slice[s+1:]...)
+// }

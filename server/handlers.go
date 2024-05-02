@@ -29,6 +29,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 		// Verify https (if not dev mode)
 		if !server._config.DevMode {
 			if r.URL.Scheme != "https" {
+				log.Println("Unsecure connection in prod mode")
 				http.Error(w, "Secure connection required", http.StatusUnauthorized)
 				return
 			}
@@ -37,6 +38,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 		// Get Bearer token
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" || getBearerTokenFromHeader(authHeader) == "" {
+			log.Println("Empty auth header")
 			http.Error(w, "Authorization header required", http.StatusUnauthorized)
 			return
 		}
@@ -47,12 +49,13 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 		if f, ok := server.authProviders()[server._config.AuthType]; ok {
 			userId, err = f(getBearerTokenFromHeader(authHeader))
 		} else {
-			log.Println("Bad auth configuration")
+			log.Println("Problem during the authorization")
 			http.Error(w, "Problem during the authorization", http.StatusBadRequest)
 			return
 		}
 
 		if err != nil {
+			log.Println("Problem during the authorization, err:", err)
 			http.Error(w, "Invalid auth token", http.StatusUnauthorized)
 			// NOTE : we're loosing all error details (400 vs 401 vs 404). What do we really want?
 			return
@@ -82,6 +85,7 @@ func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
 	userId, ok := r.Context().Value("userId").(string)
 	if !ok {
+		log.Println("Authorization info not found")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
