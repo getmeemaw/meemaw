@@ -12,7 +12,9 @@ Meemaw's iOS SDK works in concert with the [Argent Labs Web3 Library](https://gi
 
 ## Install SDK in your Xcode project
 
-[drag and drop etc]
+Adding our iOS SDK to your app is as simple as adding a Package Dependency using our iOS SDK repo: `https://github.com/getmeemaw/meemaw-ios`
+
+You can find more info about adding packages in [Xcode docs](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app).
 
 ## Use SDK in Swift
 
@@ -21,7 +23,7 @@ Meemaw's iOS SDK works in concert with the [Argent Labs Web3 Library](https://gi
 Your first step is to initialise Meemaw and to "get" a wallet. If no wallet currently exists for a given user, the SDK will generate a new one in concert with the server (TSS process). If one exists, the SDK will use it.
 
 ```swift
-import MeemawSDK
+import meemaw
 import web3
 
 guard let clientUrl = URL(string: "JSON-RPC_API_URL") else { return }
