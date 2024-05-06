@@ -15,8 +15,8 @@
 <br />
 
 Deploy a trustless wallet for each of your users, in a few lines of code 🚀 
-* Join the community on [Discord](#)
-* [Contribute](CONTRIBUTING.md)
+* Join us on [Discord](#)
+* [Get started](https://getmeemaw.com/docs/getting-started)
   
 [https://getmeemaw.com](https://getmeemaw.com)
 
