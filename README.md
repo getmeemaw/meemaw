@@ -14,7 +14,7 @@
 
 <br />
 
-Meemaw is on a mission to make trustless technologies available to everyone, even your Grandma 🚀 
+Deploy a trustless wallet for each of your users, in a few lines of code 🚀 
 * Join the community on [Discord](#)
 * [Contribute](CONTRIBUTING.md)
   
