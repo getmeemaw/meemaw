@@ -68,8 +68,8 @@ Exciting things we're looking forward to:
 - [ ] **Multi-devices**: Most MPC-TSS Wallet providers only allow your users to access their wallet from one device. The plan is to allow your users to securely add new devices that are also able to access the wallet and its assets.
 - [ ] **Biometrics & Passkeys**: Depending on platforms and applications, you will be able to encrypt and protect client shares with biometrics and/or passkeys. We want to reach state of the art security on all aspects.
 - [ ] **Cloud offering**: You can easily self-host Meemaw with a few clicks, and soon you will be able to trust us to host it for you and make your life easier and safer. We will also offer Entreprise services and additional features for ambitious projects.
-<!-- - [ ] **Dual server mode**: You will be able to perform the TSS process between two servers, removing the need to store anything client-side. You will also be able to combine one server you self-host and one server we host on our cloud, maximising the benefits. -->
 - [ ] **Account abstraction**: People often oppose MPC wallets with account abstractions, but they are complementary! We will combine them so you can abstract gas payment from your users, innovate on UX and add one more layer of protection, for example.
+<!-- - [ ] **Dual server mode**: You will be able to perform the TSS process between two servers, removing the need to store anything client-side. You will also be able to combine one server you self-host and one server we host on our cloud, maximising the benefits. -->
 
 We're super excited ☀️
 
