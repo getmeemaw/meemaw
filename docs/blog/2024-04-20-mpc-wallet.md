@@ -14,6 +14,8 @@ Imagine a world where Steve Jobs and a Swiss Banker collaborate to create a cryp
 
 To understand the technology, let's compare it to a real-life situation. Imagine you're a millionaire with stacks of $100 bills to your name. How would you secure this wealth?
 
+<!-- truncate -->
+
 ## From Mattress to Arnold Schwarzekeeper
 
 The simplest way, albeit not the most practical, would be to stash all your money under your mattress. This is similar to conventional crypto wallets where you hold the private keys that unlock your funds. You are the only one in control, and the only one responsible for your funds security. When you use apps like Metamask, this is essentially what you are doing.

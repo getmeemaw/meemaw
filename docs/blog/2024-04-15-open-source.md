@@ -26,6 +26,8 @@ Problems :
 
 Don't worry, your real house is not at risk! But let me explain. If you're planning to deploy a wallet for each of your users, you should seriously consider a wallet-as-a-service solution that is **open-source**. We believe it's essential for your business's long-term success, not just a nice to have. Here's why, through a simple story:
 
+<!-- truncate -->
+
 ## Bob builds a brand new house
 
 Bob is building a dream home for his family. He hopes it will be filled with happy memories for years to come. Today, he's ready to lay the concrete foundation. But there's a problem. His land is very acidic, which eats concrete like butter.
