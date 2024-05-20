@@ -22,6 +22,8 @@ import (
 	_ "embed"
 )
 
+type contextKey string
+
 // identityMiddleware is a middleware used to get the userId from auth provider based on a generic bearer token provided by the client
 // used by /identify and /authorize
 func (server *Server) identityMiddleware(next http.Handler) http.Handler {
@@ -63,7 +65,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 
 		// Store userId in context for next request in the stack
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userId", userId)
+		ctx = context.WithValue(ctx, contextKey("userId"), userId)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -148,8 +150,8 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 
 		// Add the userId and token to the context
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userId", userIdStr)
-		ctx = context.WithValue(ctx, "token", tokenParam[0])
+		ctx = context.WithValue(ctx, contextKey("userId"), userIdStr)
+		ctx = context.WithValue(ctx, contextKey("token"), tokenParam[0])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
