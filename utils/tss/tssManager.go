@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/getamis/alice/crypto/ecpointgrouplaw"
 	elliptic_alice "github.com/getamis/alice/crypto/elliptic"
 	"golang.org/x/crypto/sha3"
 	"nhooyr.io/websocket"
@@ -84,6 +85,11 @@ func (k *Pubkey) GetStr() PubkeyStr {
 		X: k.X.String(),
 		Y: k.Y.String(),
 	}
+}
+
+func (k *Pubkey) GetECPoint() (*ecpointgrouplaw.ECPoint, error) {
+	curve := elliptic_alice.Secp256k1()
+	return ecpointgrouplaw.NewECPoint(curve, k.X, k.Y)
 }
 
 ///////////
@@ -642,4 +648,47 @@ func GenerateSignature(r, s *big.Int, pubkey *Pubkey, msg []byte) ([]byte, error
 	// log.Println("verified go-ethereum newSignature?", ok)
 
 	return newSignature, nil
+}
+
+///////////////////////////
+/// RECOVER PRIVATE KEY ///
+///////////////////////////
+
+func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, clientShareStr string, BKs map[string]BK) (*ecdsa.PrivateKey, error) {
+	curve := elliptic_alice.Secp256k1()
+
+	pubkey, err := NewPubkey(pubkeyStr)
+	if err != nil {
+		return nil, err
+	}
+
+	ECPoint, err := pubkey.GetECPoint()
+	if err != nil {
+		return nil, err
+	}
+
+	dkgResultServer, err := ConvertDKGResult(pubkey, serverShareStr, BKs, curve)
+	if err != nil {
+		return nil, err
+	}
+
+	clientShare, ok := new(big.Int).SetString(clientShareStr, 10)
+	if !ok {
+		log.Println("Cannot convert string to big int", "share", clientShareStr)
+		return nil, ErrConversion
+	}
+
+	RecoveryPeers := make([]RecoveryPeer, 0)
+
+	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
+		share: dkgResultServer.Share,
+		bk:    dkgResultServer.Bks["server"],
+	})
+
+	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
+		share: clientShare,
+		bk:    dkgResultServer.Bks["client"],
+	})
+
+	return RecoverPrivateKey(curve, 2, ECPoint, RecoveryPeers)
 }

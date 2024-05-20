@@ -164,6 +164,59 @@ func Sign(host string, message []byte, dkgResultStr string, authData string) (*t
 	return signature, nil
 }
 
+// Recover recovers the private key from the server and client shares
+// Requires the dkgResult (i.e. client-side of wallet), authData (to confirm authorization and identify user) and host
+func Recover(host string, dkgResultStr string, authData string) (string, error) {
+
+	// Get temporary access token from server based on auth data
+	token, err := getAccessToken(host, authData)
+	if err != nil {
+		log.Println("error getting access token:", err)
+		return "", &types.ErrUnauthorized{}
+	}
+
+	// Prepare query
+	path := "/recover?token=" + token
+
+	_host, err := urlToHttp(host)
+	if err != nil {
+		log.Println("error getting ws host:", err)
+		return "", &types.ErrBadRequest{}
+	}
+
+	// Get client share
+	var dkgResult tss.DkgResult
+	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
+	if err != nil {
+		log.Println("error unmarshaling signingParameters:", err)
+		return "", &types.ErrBadRequest{}
+	}
+
+	share := dkgResult.Share
+
+	// Create the form data
+	formData := url.Values{
+		"share": {share},
+	}
+
+	// Send POST request
+	resp, err := http.PostForm(_host+path, formData)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return "", &types.ErrBadRequest{}
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("Error reading response body:", err)
+		return "", &types.ErrBadRequest{}
+	}
+
+	return string(body), nil
+}
+
 //////////////
 //// UTIL ////
 //////////////

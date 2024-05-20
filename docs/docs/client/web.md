@@ -118,3 +118,23 @@ const signature = await wallet.SignBytes(message);
 ```
 
 Note that this just signs arbitrary bytes, it does not comply with Ethereum specifics standards. You probably want to check [eip-191](https://eips.ethereum.org/EIPS/eip-191) and [eip-712](https://eips.ethereum.org/EIPS/eip-712). We will probably add some helpers in the future, similarly to our iOS SDK.
+
+### Export private key
+
+You can offer your users to export their private key:
+
+```javascript
+const privateKey = await wallet.Recover();
+```
+
+This is useful if your users want to manage their wallet outside of your platform, for example.
+
+:::warning
+Meemaw wallets are MPC wallets. Until you decide otherwise, **no private key exists**, transactions are signed during a collaboration process between the server and the client.
+
+However, **it is possible to generate the private key corresponding to the wallet**. The way it works is the following: the client sends its TSS share to the server, which then combines the client share with its own share to form a private key.
+
+It is important to understand that by doing so, **you completely loose the security and decentralization benefits of MPC wallets**: anyone with access to this private key can spend the funds contained in the wallet.
+
+It is also important to note that **the MPC wallet still exist**, it's just that the private key now exists as well and can bypass the whole TSS process.
+:::

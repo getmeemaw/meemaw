@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/getamis/alice/crypto/birkhoffinterpolation"
-	"github.com/getamis/alice/crypto/ecpointgrouplaw"
 	elliptic "github.com/getamis/alice/crypto/elliptic"
 	"github.com/getamis/alice/crypto/homo/paillier"
 	"github.com/getamis/alice/crypto/tss/dkg"
@@ -61,7 +60,7 @@ func ConvertDKGResult(k *Pubkey, cfgShare string, cfgBKs map[string]BK, curve el
 	// 	log.Error("Cannot convert string to big int", "y", cfgPubkey.Y)
 	// 	return nil, ErrConversion
 	// }
-	pubkey, err := ecpointgrouplaw.NewECPoint(curve, k.X, k.Y)
+	pubkey, err := k.GetECPoint()
 	if err != nil {
 		log.Println("Cannot get public key", "err", err)
 		return nil, err

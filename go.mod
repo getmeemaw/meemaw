@@ -10,7 +10,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.4
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/ethereum/go-ethereum v1.14.3
-	github.com/getamis/alice v1.0.2
+	github.com/getamis/alice v1.0.4-0.20240124014712-a7d6ff6d44f8
 	github.com/getamis/sirius v1.1.16
 	github.com/go-chi/chi v1.5.4
 	github.com/google/uuid v1.3.1
@@ -55,7 +55,7 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
-	github.com/klauspost/compress v1.15.15 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect

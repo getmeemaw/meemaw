@@ -62,6 +62,7 @@ func NewServer(queries *Queries, config *Config, logging bool) *Server {
 	r.With(server.identityMiddleware).Get("/authorize", server.AuthorizeHandler)
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
+	r.With(server.authMiddleware).Post("/recover", server.RecoverHandler)
 
 	server._router = r
 
