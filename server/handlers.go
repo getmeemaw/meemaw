@@ -85,7 +85,7 @@ func (server *Server) ServeWasm(w http.ResponseWriter, r *http.Request) {
 // It uses identityMiddleware to get the userId from auth provider based on a generic bearer token provided by the client, then returns it
 func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value("userId").(string)
+	userId, ok := r.Context().Value(contextKey("userId")).(string)
 	if !ok {
 		log.Println("Authorization info not found")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -101,7 +101,7 @@ func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 // It then creates an access token linked to that userId, stores it in cache and returns it
 func (server *Server) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value("userId").(string)
+	userId, ok := r.Context().Value(contextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -161,13 +161,13 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 // stores the result of dkg in DB (new wallet)
 func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value("userId").(string)
+	userId, ok := r.Context().Value(contextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value("token").(string)
+	token, ok := r.Context().Value(contextKey("token")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -250,14 +250,14 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 // requires a hex-encoded message to be signed (provided in URL parameter)
 func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value("userId").(string)
+	userId, ok := r.Context().Value(contextKey("userId")).(string)
 	if !ok {
 		// If there's no userID in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value("token").(string)
+	token, ok := r.Context().Value(contextKey("token")).(string)
 	if !ok {
 		// If there's no token in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
