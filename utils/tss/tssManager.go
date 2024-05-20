@@ -476,7 +476,7 @@ func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 				}
 			}
 
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready
 		}
 	}
 }
