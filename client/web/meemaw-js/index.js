@@ -53,6 +53,21 @@ export class Wallet {
 
         return "0x"+signature;
     }
+
+    // Recover recovers the private key based on client and server shares
+    async Recover() {
+
+        let privateKey = ""
+
+        try {
+            privateKey = await window.Recover(this.host, this.dkgResult, this.authData);
+        } catch (error) {
+            console.log("error while recovering private key:", error)
+            throw error;
+        }
+
+        return "0x"+privateKey;
+    }
 }
 
 export default class Meemaw {
