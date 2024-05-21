@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/utils/types"
 )
 
@@ -14,7 +15,7 @@ var _userId string
 func TestSupabase(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
-	queries := New(nil)
+	queries := database.New(nil)
 	var config = Config{
 		SupabaseUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:    "supabase",
@@ -136,7 +137,7 @@ func TestSupabase(t *testing.T) {
 func TestCustomAuth(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
-	queries := New(nil)
+	queries := database.New(nil)
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:      "custom",

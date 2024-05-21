@@ -9,6 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/getmeemaw/meemaw/server"
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -39,7 +40,7 @@ func main() {
 	defer db.Close()
 
 	// load sqlc queries
-	queries := server.New(db)
+	queries := database.New(db)
 
 	// verify db connexion for good measure
 	_, err = queries.Status(context.Background())

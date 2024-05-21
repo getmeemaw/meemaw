@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
 )
@@ -55,7 +56,7 @@ func (server *Server) StoreWallet(userAgent string, userId string, dkgResults *t
 		return err
 	}
 
-	walletQueryParams := AddWalletParams{
+	walletQueryParams := database.AddWalletParams{
 		UserId:        user.ID,
 		PublicAddress: dkgResults.Address,
 		Share:         dkgResults.Share,
@@ -67,7 +68,7 @@ func (server *Server) StoreWallet(userAgent string, userId string, dkgResults *t
 		return err
 	}
 
-	deviceQueryParams := AddDeviceParams{
+	deviceQueryParams := database.AddDeviceParams{
 		UserId:    user.ID,
 		WalletId:  wallet.ID,
 		UserAgent: userAgent,

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/getmeemaw/meemaw/server"
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
 )
@@ -17,7 +18,7 @@ func TestStoreAndRetrieveWallet(t *testing.T) {
 		ClientOrigin: "localhost",
 	}
 
-	queries := server.New(db)
+	queries := database.New(db)
 
 	_, err := queries.Status(context.Background())
 	if err != nil {

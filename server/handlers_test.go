@@ -7,13 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/google/uuid"
 )
 
 func TestAuthorize(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
-	queries := New(nil)
+	queries := database.New(nil)
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:      "custom",

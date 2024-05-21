@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CAFxX/httpcompression"
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/patrickmn/go-cache"
@@ -16,14 +17,14 @@ import (
 )
 
 type Server struct {
-	_queries *Queries
+	_queries *database.Queries
 	_cache   *cache.Cache
 	_config  *Config
 	_router  *chi.Mux
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(queries *Queries, config *Config, logging bool) *Server {
+func NewServer(queries *database.Queries, config *Config, logging bool) *Server {
 	server := Server{
 		_queries: queries,
 		_cache:   cache.New(2*time.Minute, 3*time.Minute),

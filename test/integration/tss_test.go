@@ -12,6 +12,7 @@ import (
 
 	"github.com/getmeemaw/meemaw/client"
 	"github.com/getmeemaw/meemaw/server"
+	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
 	"github.com/google/uuid"
@@ -207,7 +208,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 		DevMode:       true,
 	}
 
-	queries := server.New(db)
+	queries := database.New(db)
 
 	_, err := queries.Status(context.Background())
 	if err != nil {
@@ -295,7 +296,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 		DevMode:       true,
 	}
 
-	queries := server.New(db)
+	queries := database.New(db)
 
 	_, err := queries.Status(context.Background())
 	if err != nil {
