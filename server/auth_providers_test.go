@@ -25,7 +25,7 @@ func TestSupabase(t *testing.T) {
 		AuthType:    "supabase",
 	}
 
-	_server := NewServer(vault, &config, false)
+	_server := NewServer(vault, &config, nil, false)
 
 	var testDescription string
 	var userId string
@@ -73,7 +73,7 @@ func TestSupabase(t *testing.T) {
 		"updated_at": "2023-09-19T04:24:30.88819Z"
 	}`
 
-	userId, err = _server.Supabase("my-token")
+	userId, err = _server.Supabase(_server._config.SupabaseUrl, _server._config.SupabaseApiKey, "my-token")
 	if err != nil {
 		t.Errorf("Failed "+testDescription+": expected userId, got error: %s\n", err)
 	} else {
@@ -120,7 +120,7 @@ func TestSupabase(t *testing.T) {
 		"updated_at": "2023-09-19T04:24:30.88819Z"
 	}`
 
-	userId, err = _server.Supabase("my-token")
+	userId, err = _server.Supabase(_server._config.SupabaseUrl, _server._config.SupabaseApiKey, "my-token")
 	types.ProcessShouldError(testDescription, err, &types.ErrBadRequest{}, userId, t) // should be something else than bad request ?
 
 	///////////////////
@@ -130,12 +130,16 @@ func TestSupabase(t *testing.T) {
 
 	_userId = "my-user"
 
-	userId, err = _server.Supabase("my-token")
+	userId, err = _server.Supabase(_server._config.SupabaseUrl, _server._config.SupabaseApiKey, "my-token")
 	types.ProcessShouldError(testDescription, err, &types.ErrBadRequest{}, userId, t) // should be different kind of error ??
 
 	///////////////////
 	/// COMMON TESTS
-	commonTests(_server.Supabase, t)
+	fn := func(token string) (string, error) {
+		return _server.Supabase(_server._config.SupabaseUrl, _server._config.SupabaseApiKey, token)
+	}
+
+	commonTests(fn, t)
 }
 
 func TestCustomAuth(t *testing.T) {
@@ -150,7 +154,7 @@ func TestCustomAuth(t *testing.T) {
 		AuthType:      "custom",
 	}
 
-	_server := NewServer(vault, &config, false)
+	_server := NewServer(vault, &config, nil, false)
 
 	var testDescription string
 	var userId string
@@ -163,7 +167,7 @@ func TestCustomAuth(t *testing.T) {
 
 	_userId = "my-user-id"
 
-	userId, err = _server.CustomAuth("my-token")
+	userId, err = _server.CustomAuth(_server._config.AuthServerUrl, "my-token")
 	if err != nil {
 		t.Errorf("Failed "+testDescription+": expected userId, got error: %s\n", err)
 	} else {
@@ -176,7 +180,12 @@ func TestCustomAuth(t *testing.T) {
 
 	///////////////////
 	/// COMMON TESTS
-	commonTests(_server.CustomAuth, t)
+
+	fn := func(token string) (string, error) {
+		return _server.CustomAuth(_server._config.AuthServerUrl, token)
+	}
+
+	commonTests(fn, t)
 }
 
 func commonTests(authFn func(string) (string, error), t *testing.T) {

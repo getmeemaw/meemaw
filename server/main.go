@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"runtime"
@@ -17,19 +18,37 @@ import (
 )
 
 type Server struct {
-	_vault  *vault.Vault
-	_cache  *cache.Cache
-	_config *Config
-	_router *chi.Mux
+	_vault         *vault.Vault
+	_cache         *cache.Cache
+	_config        *Config
+	_router        *chi.Mux
+	_getAuthConfig func(context.Context, *Server) AuthConfig
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
+func NewServer(vault *vault.Vault, config *Config, getAuthConfig func(context.Context, *Server) AuthConfig, logging bool) *Server {
 	server := Server{
 		_vault:  vault,
 		_cache:  cache.New(2*time.Minute, 3*time.Minute),
 		_config: config,
 	}
+
+	// Auth Config
+	if getAuthConfig != nil {
+		server._getAuthConfig = getAuthConfig
+	} else {
+		// authentication selector based on config
+		server._getAuthConfig = func(ctx context.Context, server *Server) AuthConfig {
+			return AuthConfig{
+				AuthType:       server._config.AuthType,
+				AuthServerUrl:  server._config.AuthServerUrl,
+				SupabaseUrl:    server._config.SupabaseUrl,
+				SupabaseApiKey: server._config.SupabaseApiKey,
+			}
+		}
+	}
+
+	// Router
 
 	_cors := cors.New(cors.Options{
 		AllowedOrigins:   []string{server._config.ClientOrigin},

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,10 +14,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func (server *Server) authProviders() map[string]func(string) (string, error) {
-	return map[string]func(string) (string, error){
-		"supabase": server.Supabase,
-		"custom":   server.CustomAuth,
+type AuthConfig struct {
+	AuthType       string
+	AuthServerUrl  string
+	SupabaseUrl    string
+	SupabaseApiKey string
+}
+
+func (server *Server) authProviders(authConfig AuthConfig, bearerToken string) (string, error) {
+	if authConfig.AuthType == "supabase" {
+		return server.Supabase(authConfig.SupabaseUrl, authConfig.SupabaseApiKey, bearerToken)
+	} else if authConfig.AuthType == "custom" {
+		return server.CustomAuth(authConfig.AuthServerUrl, bearerToken)
+	} else {
+		return "", errors.New("wrong auth type")
 	}
 }
 
@@ -24,8 +35,8 @@ type SupabaseUser struct {
 	ID string `json:"id"`
 }
 
-// Supabase calls Supabase server (address and API key in server config) to get the userId, based on the Supabase JWT provided
-func (server *Server) Supabase(jwt string) (string, error) {
+// Supabase calls Supabase server to get the userId, based on the Supabase JWT provided
+func (server *Server) Supabase(supabaseUrl, supabaseApiKey, jwt string) (string, error) {
 
 	// Verify jwt is not empty
 	if len(jwt) == 0 {
@@ -33,13 +44,13 @@ func (server *Server) Supabase(jwt string) (string, error) {
 	}
 
 	// Get userId from Supabase
-	req, err := http.NewRequest("GET", strings.TrimSuffix(server._config.SupabaseUrl, "/")+"/auth/v1/user", nil)
+	req, err := http.NewRequest("GET", strings.TrimSuffix(supabaseUrl, "/")+"/auth/v1/user", nil)
 	if err != nil {
 		return "", err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	req.Header.Set("apikey", server._config.SupabaseApiKey)
+	req.Header.Set("apikey", supabaseApiKey)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -90,8 +101,8 @@ func (server *Server) Supabase(jwt string) (string, error) {
 }
 
 // CustomAuth gets the userId from a generic CustomAuth auth provider, based on a token representing a session or connexion
-// Calls the generic CustomAuth auth provider using the webhook provided (server config) with pre-established API contract
-func (server *Server) CustomAuth(token string) (string, error) {
+// Calls the generic CustomAuth auth provider using the webhook provided (auth config) with agreed upon API contract
+func (server *Server) CustomAuth(authServerUrl, token string) (string, error) {
 
 	// Verify jwt is not empty
 	if len(token) == 0 {
@@ -99,7 +110,7 @@ func (server *Server) CustomAuth(token string) (string, error) {
 	}
 
 	// Get userId from custom auth provider
-	url := server._config.AuthServerUrl
+	url := authServerUrl
 
 	type AuthData struct {
 		Token string `json:"token"`

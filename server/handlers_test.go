@@ -25,7 +25,7 @@ func TestAuthorize(t *testing.T) {
 		DevMode:       true,
 	}
 
-	_server := NewServer(vault, &config, false)
+	_server := NewServer(vault, &config, nil, false)
 
 	authorizeServer := httptest.NewServer(_server.Router())
 

@@ -28,6 +28,8 @@ type contextKey string
 // used by /identify and /authorize
 func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		// Verify https (if not dev mode)
 		if !server._config.DevMode {
 			if r.URL.Scheme != "https" {
@@ -45,17 +47,11 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Get userId from auth provider, based on Bearer token
-		var userId string
-		var err error
-		if f, ok := server.authProviders()[server._config.AuthType]; ok {
-			userId, err = f(getBearerTokenFromHeader(authHeader))
-		} else {
-			log.Println("Problem during the authorization")
-			http.Error(w, "Problem during the authorization", http.StatusBadRequest)
-			return
-		}
+		// Auth config
+		authConfig := server._getAuthConfig(ctx, server)
 
+		// Get userId from auth provider, based on Bearer token
+		userId, err := server.authProviders(authConfig, getBearerTokenFromHeader(authHeader))
 		if err != nil {
 			log.Println("Problem during the authorization, err:", err)
 			http.Error(w, "Invalid auth token", http.StatusUnauthorized)
@@ -64,7 +60,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Store userId in context for next request in the stack
-		ctx := r.Context()
+
 		ctx = context.WithValue(ctx, contextKey("userId"), userId)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
