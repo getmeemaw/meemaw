@@ -26,7 +26,7 @@ type Server struct {
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(vault *vault.Vault, config *Config, getAuthConfig func(context.Context, *Server) AuthConfig, logging bool) *Server {
+func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 	server := Server{
 		_vault:  vault,
 		_cache:  cache.New(2*time.Minute, 3*time.Minute),
@@ -34,17 +34,12 @@ func NewServer(vault *vault.Vault, config *Config, getAuthConfig func(context.Co
 	}
 
 	// Auth Config
-	if getAuthConfig != nil {
-		server._getAuthConfig = getAuthConfig
-	} else {
-		// authentication selector based on config
-		server._getAuthConfig = func(ctx context.Context, server *Server) AuthConfig {
-			return AuthConfig{
-				AuthType:       server._config.AuthType,
-				AuthServerUrl:  server._config.AuthServerUrl,
-				SupabaseUrl:    server._config.SupabaseUrl,
-				SupabaseApiKey: server._config.SupabaseApiKey,
-			}
+	server._getAuthConfig = func(ctx context.Context, server *Server) AuthConfig {
+		return AuthConfig{
+			AuthType:       server._config.AuthType,
+			AuthServerUrl:  server._config.AuthServerUrl,
+			SupabaseUrl:    server._config.SupabaseUrl,
+			SupabaseApiKey: server._config.SupabaseApiKey,
 		}
 	}
 
@@ -100,6 +95,11 @@ func (server *Server) Vault() *vault.Vault {
 	return server._vault
 }
 
+// UpdateGetAuthConfig changes the auth config getter
+func (server *Server) UpdateGetAuthConfig(getAuthConfig func(context.Context, *Server) AuthConfig) {
+	server._getAuthConfig = getAuthConfig
+}
+
 // Start starts the web server on given port
 func (server *Server) Start() {
 	log.Println("Starting server on port", server._config.Port)
@@ -111,18 +111,6 @@ func (server *Server) Start() {
 			log.Fatal("Server not in dev mode and not all targets are https")
 		}
 
-		// Check that auth config is complete
-		if server._config.AuthType == "supabase" {
-			if len(server._config.SupabaseApiKey) == 0 || len(server._config.SupabaseUrl) == 0 {
-				log.Fatal("Missing Supabase config")
-			}
-		} else if server._config.AuthType == "custom" {
-			if len(server._config.AuthServerUrl) == 0 {
-				log.Fatal("Missing custom auth url")
-			}
-		} else {
-			log.Fatal("Unknown auth")
-		}
 	}
 
 	if runtime.GOOS == "darwin" {

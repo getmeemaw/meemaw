@@ -68,7 +68,7 @@ func main() {
 	}
 
 	// create server based on queries and config
-	server := server.NewServer(vault, config, nil, logging)
+	server := server.NewServer(vault, config, logging)
 
 	// start server
 	server.Start()

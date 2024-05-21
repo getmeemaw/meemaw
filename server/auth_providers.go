@@ -23,8 +23,14 @@ type AuthConfig struct {
 
 func (server *Server) authProviders(authConfig AuthConfig, bearerToken string) (string, error) {
 	if authConfig.AuthType == "supabase" {
+		if len(authConfig.SupabaseApiKey) == 0 || len(authConfig.SupabaseUrl) == 0 {
+			return "", errors.New("missing Supabase config")
+		}
 		return server.Supabase(authConfig.SupabaseUrl, authConfig.SupabaseApiKey, bearerToken)
 	} else if authConfig.AuthType == "custom" {
+		if len(authConfig.AuthServerUrl) == 0 {
+			return "", errors.New("missing custom auth url")
+		}
 		return server.CustomAuth(authConfig.AuthServerUrl, bearerToken)
 	} else {
 		return "", errors.New("wrong auth type")
