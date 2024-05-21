@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"runtime"
@@ -98,6 +99,19 @@ func (server *Server) Vault() *vault.Vault {
 // UpdateGetAuthConfig changes the auth config getter
 func (server *Server) UpdateGetAuthConfig(getAuthConfig func(context.Context, *Server) AuthConfig) {
 	server._getAuthConfig = getAuthConfig
+}
+
+// AddRoute adds an endpoint to the server. Note that it will go through authMiddleware for security reasons.
+func (server *Server) AddRoute(method string, pattern string, h http.HandlerFunc) error {
+	if strings.ToLower(method) == "get" {
+		server._router.With(server.authMiddleware).Get(pattern, h)
+		return nil
+	} else if strings.ToLower(method) == "post" {
+		server._router.With(server.authMiddleware).Post(pattern, h)
+		return nil
+	} else {
+		return errors.New("method not recognized")
+	}
 }
 
 // Start starts the web server on given port
