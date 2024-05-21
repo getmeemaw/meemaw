@@ -1,4 +1,4 @@
-package server
+package vault
 
 import (
 	"context"
@@ -10,10 +10,18 @@ import (
 	"github.com/getmeemaw/meemaw/utils/types"
 )
 
+type Vault struct {
+	_queries *database.Queries
+}
+
+func New(queries *database.Queries) *Vault {
+	return &Vault{_queries: queries}
+}
+
 // RetrieveWallet retrieves a wallet from DB based on the userID of the user (which is a loose foreign key, the format will depend on the auth provider)
 // Tested in integration tests (with throw away db)
-func (server *Server) RetrieveWallet(foreignKey string) (*tss.DkgResult, error) {
-	res, err := server._queries.GetUserSigningParameters(context.Background(), foreignKey)
+func (vault *Vault) RetrieveWallet(ctx context.Context, foreignKey string) (*tss.DkgResult, error) {
+	res, err := vault._queries.GetUserSigningParameters(ctx, foreignKey)
 	if err != nil {
 		log.Println("error getting signing params:", err)
 		return nil, &types.ErrNotFound{}
@@ -40,8 +48,8 @@ func (server *Server) RetrieveWallet(foreignKey string) (*tss.DkgResult, error) 
 
 // StoreWallet upserts a wallet (if it already exists, it does nothing, no error returned)
 // Tested in integration tests (with throw away db)
-func (server *Server) StoreWallet(userAgent string, userId string, dkgResults *tss.DkgResult) error {
-	user, err := server._queries.AddUser(context.Background(), userId)
+func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId string, dkgResults *tss.DkgResult) error {
+	user, err := vault._queries.AddUser(ctx, userId)
 	if err != nil {
 		return err
 	}
@@ -63,7 +71,7 @@ func (server *Server) StoreWallet(userAgent string, userId string, dkgResults *t
 		Params:        params,
 	}
 
-	wallet, err := server._queries.AddWallet(context.Background(), walletQueryParams)
+	wallet, err := vault._queries.AddWallet(ctx, walletQueryParams)
 	if err != nil {
 		return err
 	}
@@ -74,10 +82,16 @@ func (server *Server) StoreWallet(userAgent string, userId string, dkgResults *t
 		UserAgent: userAgent,
 	}
 
-	_, err = server._queries.AddDevice(context.Background(), deviceQueryParams)
+	_, err = vault._queries.AddDevice(ctx, deviceQueryParams)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// WalletExists verifies if a wallet already exists
+func (vault *Vault) WalletExists(ctx context.Context, userId string) error {
+	_, err := vault._queries.GetUserByForeignKey(ctx, userId)
+	return err
 }

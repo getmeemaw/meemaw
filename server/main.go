@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/CAFxX/httpcompression"
-	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/patrickmn/go-cache"
@@ -17,18 +17,18 @@ import (
 )
 
 type Server struct {
-	_queries *database.Queries
-	_cache   *cache.Cache
-	_config  *Config
-	_router  *chi.Mux
+	_vault  *vault.Vault
+	_cache  *cache.Cache
+	_config *Config
+	_router *chi.Mux
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(queries *database.Queries, config *Config, logging bool) *Server {
+func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 	server := Server{
-		_queries: queries,
-		_cache:   cache.New(2*time.Minute, 3*time.Minute),
-		_config:  config,
+		_vault:  vault,
+		_cache:  cache.New(2*time.Minute, 3*time.Minute),
+		_config: config,
 	}
 
 	_cors := cors.New(cors.Options{
@@ -73,6 +73,11 @@ func NewServer(queries *database.Queries, config *Config, logging bool) *Server 
 // Router returns the router of the server (useful for tests)
 func (server *Server) Router() http.Handler {
 	return server._router
+}
+
+// Vault returns the vault of the server (useful for tests)
+func (server *Server) Vault() *vault.Vault {
+	return server._vault
 }
 
 // Start starts the web server on given port

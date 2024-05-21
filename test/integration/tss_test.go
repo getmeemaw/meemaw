@@ -13,6 +13,7 @@ import (
 	"github.com/getmeemaw/meemaw/client"
 	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
 	"github.com/google/uuid"
@@ -210,14 +211,18 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 	queries := database.New(db)
 
-	_, err := queries.Status(context.Background())
+	vault := vault.New(queries)
+
+	ctx := context.Background()
+
+	_, err := queries.Status(ctx)
 	if err != nil {
 		log.Println("Could not connect to db... ", err)
 		return nil, nil, err
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(queries, &config, logging)
+	_server := server.NewServer(vault, &config, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// // debug : leave time to manually check db status
@@ -235,7 +240,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		err = _server.StoreWallet(parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
 		if err != nil {
 			log.Println("Error storing wallet:", err)
 			return nil, nil, err
@@ -298,13 +303,17 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 	queries := database.New(db)
 
-	_, err := queries.Status(context.Background())
+	vault := vault.New(queries)
+
+	ctx := context.Background()
+
+	_, err := queries.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(queries, &config, logging)
+	_server := server.NewServer(vault, &config, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// Insert wallet in DB (if required)
@@ -318,7 +327,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		err = _server.StoreWallet(parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
 		if err != nil {
 			return nil, err
 		}

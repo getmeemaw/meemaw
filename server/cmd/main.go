@@ -10,6 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -42,6 +43,9 @@ func main() {
 	// load sqlc queries
 	queries := database.New(db)
 
+	// load vault
+	vault := vault.New(queries)
+
 	// verify db connexion for good measure
 	_, err = queries.Status(context.Background())
 	if err != nil {
@@ -64,7 +68,7 @@ func main() {
 	}
 
 	// create server based on queries and config
-	server := server.NewServer(queries, config, logging)
+	server := server.NewServer(vault, config, logging)
 
 	// start server
 	server.Start()

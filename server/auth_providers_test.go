@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/getmeemaw/meemaw/utils/types"
 )
 
@@ -16,12 +17,15 @@ func TestSupabase(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
 	queries := database.New(nil)
+
+	vault := vault.New(queries)
+
 	var config = Config{
 		SupabaseUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:    "supabase",
 	}
 
-	_server := NewServer(queries, &config, false)
+	_server := NewServer(vault, &config, false)
 
 	var testDescription string
 	var userId string
@@ -138,12 +142,15 @@ func TestCustomAuth(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
 	queries := database.New(nil)
+
+	vault := vault.New(queries)
+
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:      "custom",
 	}
 
-	_server := NewServer(queries, &config, false)
+	_server := NewServer(vault, &config, false)
 
 	var testDescription string
 	var userId string

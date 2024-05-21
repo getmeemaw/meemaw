@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/google/uuid"
 )
 
@@ -15,13 +16,16 @@ func TestAuthorize(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
 	queries := database.New(nil)
+
+	vault := vault.New(queries)
+
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:      "custom",
 		DevMode:       true,
 	}
 
-	_server := NewServer(queries, &config, false)
+	_server := NewServer(vault, &config, false)
 
 	authorizeServer := httptest.NewServer(_server.Router())
 

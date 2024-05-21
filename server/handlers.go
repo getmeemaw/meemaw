@@ -175,7 +175,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if no existing wallet for that user
 	// Note : update when implementing multi-device
-	_, err := server._queries.GetUserByForeignKey(context.Background(), userId)
+	err := server._vault.WalletExists(r.Context(), userId)
 	if err == nil {
 		log.Println("Wallet already exists for that user.")
 		http.Error(w, "Conflict", http.StatusConflict)
@@ -228,7 +228,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Store dkgResult
 	userAgent := r.UserAgent()
-	err = server.StoreWallet(userAgent, userId, dkgResult)
+	err = server._vault.StoreWallet(r.Context(), userAgent, userId, dkgResult)
 	if err != nil {
 		log.Println("Error while storing dkg result:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -281,7 +281,7 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve wallet from DB for given userId
-	dkgResult, err := server.RetrieveWallet(userId)
+	dkgResult, err := server._vault.RetrieveWallet(r.Context(), userId)
 	if err != nil {
 		if errors.Is(err, &types.ErrNotFound{}) {
 			http.Error(w, "Wallet does not exist.", http.StatusNotFound)
@@ -386,7 +386,7 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve wallet from DB for given userId
-	dkgResult, err := server.RetrieveWallet(userId)
+	dkgResult, err := server._vault.RetrieveWallet(r.Context(), userId)
 	if err != nil {
 		if errors.Is(err, &types.ErrNotFound{}) {
 			log.Println("Wallet does not exist.")
