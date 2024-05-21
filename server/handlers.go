@@ -473,3 +473,26 @@ func (server *Server) RpcHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+const headerPrefix = "M-"
+
+// headerMiddleware is a middleware used to transfer Meemaw headers to context
+func (server *Server) headerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Create a new context from the request context
+		ctx := r.Context()
+
+		// Extract headers with the specific format
+		for name, values := range r.Header {
+			if strings.HasPrefix(name, headerPrefix) && len(values) > 0 {
+				// Remove the prefix and use the remaining part as the context key
+				key := strings.TrimPrefix(name, headerPrefix)
+				// Add the first header value to the context
+				ctx = context.WithValue(ctx, contextKey(key), values[0])
+			}
+		}
+
+		// Pass the context to the next handler in the chain
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}

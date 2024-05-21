@@ -47,6 +47,7 @@ func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 		r.Use(middleware.Logger)
 	}
 	r.Use(_cors.Handler)
+	r.Use(server.headerMiddleware)
 
 	// debug rpc
 	r.HandleFunc("/rpc", server.RpcHandler)
