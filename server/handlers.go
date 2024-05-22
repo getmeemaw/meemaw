@@ -482,7 +482,7 @@ func (server *Server) headerMiddleware(next http.Handler) http.Handler {
 		for name, values := range r.Header {
 			if strings.HasPrefix(name, headerPrefix) && len(values) > 0 {
 				// Remove the prefix and use the remaining part as the context key
-				key := strings.TrimPrefix(name, headerPrefix)
+				key := strings.ToLower(strings.TrimPrefix(name, headerPrefix))
 				// Add the first header value to the context
 				ctx = context.WithValue(ctx, ContextKey(key), values[0])
 			}
