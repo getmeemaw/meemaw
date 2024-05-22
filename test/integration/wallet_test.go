@@ -21,7 +21,7 @@ func TestStoreAndRetrieveWallet(t *testing.T) {
 
 	queries := database.New(db)
 
-	vault := vault.New(queries)
+	vault := vault.NewVault(queries)
 
 	ctx := context.Background()
 

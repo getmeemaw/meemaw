@@ -44,7 +44,7 @@ func main() {
 	queries := database.New(db)
 
 	// load vault
-	vault := vault.New(queries)
+	vault := vault.NewVault(queries)
 
 	// verify db connexion for good measure
 	_, err = queries.Status(context.Background())

@@ -17,7 +17,7 @@ func TestAuthorize(t *testing.T) {
 
 	queries := database.New(nil)
 
-	vault := vault.New(queries)
+	vault := vault.NewVault(queries)
 
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),

@@ -14,7 +14,7 @@ type Vault struct {
 	_queries *database.Queries
 }
 
-func New(queries *database.Queries) *Vault {
+func NewVault(queries *database.Queries) *Vault {
 	return &Vault{_queries: queries}
 }
 

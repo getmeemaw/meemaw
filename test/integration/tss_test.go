@@ -211,7 +211,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 	queries := database.New(db)
 
-	vault := vault.New(queries)
+	vault := vault.NewVault(queries)
 
 	ctx := context.Background()
 
@@ -303,7 +303,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 	queries := database.New(db)
 
-	vault := vault.New(queries)
+	vault := vault.NewVault(queries)
 
 	ctx := context.Background()
 
