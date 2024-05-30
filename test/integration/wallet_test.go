@@ -50,7 +50,7 @@ func TestStoreAndRetrieveWallet(t *testing.T) {
 	testDescription = "test 1 (happy case)"
 	successful := true
 
-	err = _server.Vault().StoreWallet(ctx, "userAgent", "my-user-id-retrieve-one", &dkgResult)
+	_, err = _server.Vault().StoreWallet(ctx, "userAgent", "my-user-id-retrieve-one", &dkgResult)
 	if err != nil {
 		successful = false
 		t.Errorf("Failed "+testDescription+": could not store dkgResult: %+v\n", dkgResult)

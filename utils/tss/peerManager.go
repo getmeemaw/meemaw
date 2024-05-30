@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/getamis/alice/types"
 	"github.com/getamis/sirius/log"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,7 +17,7 @@ type Message struct {
 type PeerManager struct {
 	id                    string
 	peers                 map[string]bool
-	handleMessageFunction func([]byte) error
+	handleMessageFunction func(types.Message) error
 	outwardMessages       []Message
 	mu                    sync.Mutex
 }
@@ -109,11 +110,11 @@ func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 	return nextMsg, nil
 }
 
-func (p *PeerManager) RegisterHandleMessage(handleFunc func([]byte) error) {
+func (p *PeerManager) RegisterHandleMessage(handleFunc func(types.Message) error) {
 	p.handleMessageFunction = handleFunc
 }
 
-func (p *PeerManager) HandleMessage(msg []byte) error {
+func (p *PeerManager) HandleMessage(msg types.Message) error {
 	return p.handleMessageFunction(msg)
 }
 

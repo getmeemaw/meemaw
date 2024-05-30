@@ -57,7 +57,7 @@ func main() {
 	_, err = queries.GetFirstUser(context.Background())
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("Schema does not exist, creating...")
-		err = server.LoadSchema(db)
+		err = server.LoadSchema(db, "")
 		if err != nil {
 			log.Fatalf("Could not load schema: %s", err)
 		} else {

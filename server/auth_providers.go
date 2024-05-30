@@ -21,7 +21,7 @@ type AuthConfig struct {
 	SupabaseApiKey string
 }
 
-func (server *Server) authProviders(authConfig AuthConfig, bearerToken string) (string, error) {
+func (server *Server) authProviders(authConfig *AuthConfig, bearerToken string) (string, error) {
 	if authConfig.AuthType == "supabase" {
 		if len(authConfig.SupabaseApiKey) == 0 || len(authConfig.SupabaseUrl) == 0 {
 			return "", errors.New("missing Supabase config")

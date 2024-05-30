@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/CAFxX/httpcompression"
-	"github.com/getmeemaw/meemaw/server/vault"
+	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/patrickmn/go-cache"
@@ -19,15 +19,21 @@ import (
 )
 
 type Server struct {
-	_vault         *vault.Vault
+	_vault         Vault
 	_cache         *cache.Cache
 	_config        *Config
 	_router        *chi.Mux
-	_getAuthConfig func(context.Context, *Server) AuthConfig
+	_getAuthConfig func(context.Context, *Server) (*AuthConfig, error)
+}
+
+type Vault interface {
+	WalletExists(context.Context, string) error
+	StoreWallet(context.Context, string, string, *tss.DkgResult) (string, error)
+	RetrieveWallet(context.Context, string) (*tss.DkgResult, error)
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
+func NewServer(vault Vault, config *Config, logging bool) *Server {
 	server := Server{
 		_vault:  vault,
 		_cache:  cache.New(2*time.Minute, 3*time.Minute),
@@ -35,21 +41,21 @@ func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 	}
 
 	// Auth Config
-	server._getAuthConfig = func(ctx context.Context, server *Server) AuthConfig {
-		return AuthConfig{
+	server._getAuthConfig = func(ctx context.Context, server *Server) (*AuthConfig, error) {
+		return &AuthConfig{
 			AuthType:       server._config.AuthType,
 			AuthServerUrl:  server._config.AuthServerUrl,
 			SupabaseUrl:    server._config.SupabaseUrl,
 			SupabaseApiKey: server._config.SupabaseApiKey,
-		}
+		}, nil
 	}
 
 	// Router
 
 	_cors := cors.New(cors.Options{
-		AllowedOrigins:   []string{server._config.ClientOrigin},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedOrigins: []string{server._config.ClientOrigin},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		// AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -62,6 +68,7 @@ func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 		r.Use(middleware.Logger)
 	}
 	r.Use(_cors.Handler)
+	// r.Use(cors.Default().Handler)
 	r.Use(server.headerMiddleware)
 
 	// debug rpc
@@ -78,6 +85,7 @@ func NewServer(vault *vault.Vault, config *Config, logging bool) *Server {
 	r.With(server.identityMiddleware).Get("/identify", server.IdentifyHandler)
 	r.With(server.identityMiddleware).Get("/authorize", server.AuthorizeHandler)
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
+	r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
 	r.With(server.authMiddleware).Post("/recover", server.RecoverHandler)
 
@@ -92,12 +100,12 @@ func (server *Server) Router() http.Handler {
 }
 
 // Vault returns the vault of the server (useful for tests)
-func (server *Server) Vault() *vault.Vault {
+func (server *Server) Vault() Vault {
 	return server._vault
 }
 
 // UpdateGetAuthConfig changes the auth config getter
-func (server *Server) UpdateGetAuthConfig(getAuthConfig func(context.Context, *Server) AuthConfig) {
+func (server *Server) UpdateGetAuthConfig(getAuthConfig func(context.Context, *Server) (*AuthConfig, error)) {
 	server._getAuthConfig = getAuthConfig
 }
 

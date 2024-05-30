@@ -95,7 +95,7 @@ func TestMain(m *testing.M) {
 
 	// Loading schema
 	log.Println("Loading schema")
-	err = server.LoadSchema(db)
+	err = server.LoadSchema(db, "")
 	if err != nil {
 		log.Fatalf("Could not load schema: %s", err)
 	}

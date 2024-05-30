@@ -48,10 +48,10 @@ func (vault *Vault) RetrieveWallet(ctx context.Context, foreignKey string) (*tss
 
 // StoreWallet upserts a wallet (if it already exists, it does nothing, no error returned)
 // Tested in integration tests (with throw away db)
-func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId string, dkgResults *tss.DkgResult) error {
+func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId string, dkgResults *tss.DkgResult) (string, error) {
 	user, err := vault._queries.AddUser(ctx, userId)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	signingParams := tss.SigningParameters{
@@ -61,7 +61,7 @@ func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId st
 
 	params, err := json.Marshal(signingParams)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	walletQueryParams := database.AddWalletParams{
@@ -73,7 +73,7 @@ func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId st
 
 	wallet, err := vault._queries.AddWallet(ctx, walletQueryParams)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	deviceQueryParams := database.AddDeviceParams{
@@ -84,10 +84,10 @@ func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, userId st
 
 	_, err = vault._queries.AddDevice(ctx, deviceQueryParams)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return "", nil
 }
 
 // WalletExists verifies if a wallet already exists
