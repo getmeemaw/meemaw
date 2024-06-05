@@ -18,8 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"nhooyr.io/websocket"
-
-	_ "embed"
 )
 
 type ContextKey string
@@ -71,15 +69,10 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-//go:generate bash -c "GOOS=js GOARCH=wasm go build -o meemaw.wasm ../client/web/wasm/main.go"
-
-//go:embed meemaw.wasm
-var wasmBinary []byte
-
 // ServeWasm is responsible for serving the wasm module
 func (server *Server) ServeWasm(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/wasm")
-	w.Write(wasmBinary)
+	w.Write(server._wasm)
 }
 
 // IdentifyHandler is responsible for getting a unique identifier of a user from the auth provider

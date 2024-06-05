@@ -25,7 +25,7 @@ func TestSupabase(t *testing.T) {
 		AuthType:    "supabase",
 	}
 
-	_server := NewServer(vault, &config, false)
+	_server := NewServer(vault, &config, nil, false)
 
 	var testDescription string
 	var userId string
@@ -154,7 +154,7 @@ func TestCustomAuth(t *testing.T) {
 		AuthType:      "custom",
 	}
 
-	_server := NewServer(vault, &config, false)
+	_server := NewServer(vault, &config, nil, false)
 
 	var testDescription string
 	var userId string
