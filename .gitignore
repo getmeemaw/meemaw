@@ -17,7 +17,6 @@ docs/node_modules/*
 docs/.docusaurus/*
 docs/build/*
 server/cmd/cmd
-server/meemaw.wasm
 client/web/client.html.backup
 config.custom.toml
 config.toml
