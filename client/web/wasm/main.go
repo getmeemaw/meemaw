@@ -54,19 +54,19 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 	host := args[0].String()
 	authData := args[1].String()
 
-	dkgResult, err := client.Dkg(host, authData)
+	dkgResult, metadata, err := client.Dkg(host, authData)
 	if err != nil {
 		log.Println("error while dkg:", err)
 		return nil, err
 	}
 
-	ret, err := json.Marshal(dkgResult)
+	dkgResultJSON, err := json.Marshal(dkgResult)
 	if err != nil {
 		log.Println("error while marshaling dkgresult json:", err)
 		return nil, err
 	}
 
-	return string(ret), err
+	return metadata + "&&" + string(dkgResultJSON), err
 }
 
 // input : host, message (hex encoded bytes), dkgResultStr, authData
@@ -74,7 +74,8 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 func SignBytes(this js.Value, args []js.Value) (any, error) {
 	host := args[0].String()
 	dkgResultStr := args[2].String()
-	authData := args[3].String()
+	metadata := args[3].String()
+	authData := args[4].String()
 
 	hexEncodedMsg := args[1].String()
 	trimmedHexEncodedMsg := strings.TrimPrefix(strings.TrimSuffix(strings.ReplaceAll(hexEncodedMsg, "\"", ""), "\n"), "0x")
@@ -84,7 +85,7 @@ func SignBytes(this js.Value, args []js.Value) (any, error) {
 		return nil, err
 	}
 
-	signature, err := client.Sign(host, message, dkgResultStr, authData)
+	signature, err := client.Sign(host, message, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while signing:", err)
 		return nil, err
@@ -100,9 +101,10 @@ func SignBytes(this js.Value, args []js.Value) (any, error) {
 func Recover(this js.Value, args []js.Value) (any, error) {
 	host := args[0].String()
 	dkgResultStr := args[1].String()
-	authData := args[2].String()
+	metadata := args[2].String()
+	authData := args[3].String()
 
-	privateKey, err := client.Recover(host, dkgResultStr, authData)
+	privateKey, err := client.Recover(host, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while signing:", err)
 		return nil, err
@@ -114,15 +116,16 @@ func Recover(this js.Value, args []js.Value) (any, error) {
 // input : host, json encoded transaction parameters, dkgResultStr, authData, chainId
 // output : signed message, error
 func SignEthTransaction(this js.Value, args []js.Value) (any, error) {
-	if len(args) != 5 {
+	if len(args) != 6 {
 		log.Println("error when SignEthTransaction: not the correct number of arguments")
 		return nil, fmt.Errorf("not the correct number of arguments")
 	}
 
 	host := args[0].String()
 	dkgResultStr := args[2].String()
-	authData := args[3].String()
-	chainId := args[4].String()
+	metadata := args[3].String()
+	authData := args[4].String()
+	chainId := args[5].String()
 
 	jsonEncodedTx := args[1].String()
 
@@ -134,7 +137,7 @@ func SignEthTransaction(this js.Value, args []js.Value) (any, error) {
 
 	message := _tx.GenerateMessage()
 
-	signature, err := client.Sign(host, message, dkgResultStr, authData)
+	signature, err := client.Sign(host, message, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while signing:", err)
 		return nil, err

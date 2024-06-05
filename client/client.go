@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,17 +23,17 @@ import (
 // Identify gets the userId from the server (which then interacts with the auth provider) based on authData (session, access token, etc)
 // Requires authData (to confirm authorization and identify user) and host
 func Identify(host, authData string) (string, error) {
-	return getAuthDataFromServer(host, authData, "/identify")
+	return getAuthDataFromServer(host, authData, "", "/identify")
 }
 
 // Dkg performs the full dkg process on the client side
 // Requires authData (to confirm authorization and identify user) and host
-func Dkg(host, authData string) (*tss.DkgResult, error) {
+func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Get temporary access token from server based on auth data
-	token, err := getAccessToken(host, authData)
+	token, err := getAccessToken(host, "", authData)
 	if err != nil {
 		log.Println("error getting access token:", err)
-		return nil, err
+		return nil, "", err
 	}
 
 	// Prepare DKG process
@@ -41,12 +42,12 @@ func Dkg(host, authData string) (*tss.DkgResult, error) {
 	_host, err := urlToWs(host)
 	if err != nil {
 		log.Println("error getting ws host:", err)
-		return nil, err
+		return nil, "", err
 	}
 
 	dkg, err := tss.NewClientDkg()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -55,42 +56,88 @@ func Dkg(host, authData string) (*tss.DkgResult, error) {
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
 		if resp.StatusCode == 401 {
-			return nil, &types.ErrUnauthorized{}
+			return nil, "", &types.ErrUnauthorized{}
 		} else if resp.StatusCode == 400 {
-			return nil, &types.ErrBadRequest{}
+			return nil, "", &types.ErrBadRequest{}
 		} else if resp.StatusCode == 404 {
-			return nil, &types.ErrNotFound{}
+			return nil, "", &types.ErrNotFound{}
 		} else if resp.StatusCode == 409 {
-			return nil, &types.ErrConflict{}
+			return nil, "", &types.ErrConflict{}
 		} else {
 			log.Println("error dialing websocket:", err)
-			return nil, err
+			return nil, "", err
 		}
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
-	go tss.Send(dkg, ctx, c)
-	go tss.Receive(dkg, ctx, c)
+	errs := make(chan error, 2)
+
+	go tss.Send(dkg, ctx, errs, c)
+	go tss.Receive(dkg, ctx, errs, c)
 
 	// Start DKG process.
 	res, err := dkg.Process()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	// time.Sleep(time.Second)
+	// Error management
+	processErr := <-errs // wait for websocket closure from server
+	if ctx.Err() == context.Canceled {
+		log.Println("websocket closed by context cancellation:", processErr)
+		return nil, "", processErr
+	} else if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
+		log.Println("websocket closed normally")
+		cancel()
+	} else {
+		log.Println("error during websocket connection:", processErr) // it's ok, as the proper completion will be verified with /dkgtwo
+		cancel()
+	}
 
-	c.Close(websocket.StatusNormalClosure, "")
+	//////////
+	/// METADATA
 
-	return res, nil
+	_host, err = urlToHttp(host)
+	if err != nil {
+		log.Println("error getting http host:", err)
+		return nil, "", err
+	}
+
+	// Get metadata from /dkgtwo
+	path = "/dkgtwo?token=" + token
+	resp, err = http.Get(_host + path)
+	if err != nil {
+		log.Println("failed to call dkgtwo:", err)
+		return nil, "", err
+	}
+	defer resp.Body.Close() // Ensure the response body is closed
+
+	if resp.StatusCode != 200 {
+		log.Println("error during dkgtwo:", resp.Status)
+		return nil, "", errors.New("error during dkgtwo")
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read response body: %v", err)
+	}
+
+	metadata := string(body)
+
+	// time.Sleep(120 * time.Hour) // debug
+
+	// c.Close(websocket.StatusNormalClosure, "")
+
+	return res, metadata, nil
 }
 
-// Dkg performs the full signing process on the client side
+// Sign performs the full signing process on the client side
 // Requires the message to be signed, the dkgResult (i.e. client-side of wallet), authData (to confirm authorization and identify user) and host
-func Sign(host string, message []byte, dkgResultStr string, authData string) (*tss.Signature, error) {
+func Sign(host string, message []byte, dkgResultStr string, metadata string, authData string) (*tss.Signature, error) {
 
 	// Get temporary access token from server based on auth data
-	token, err := getAccessToken(host, authData)
+	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
 		log.Println("error getting access token:", err)
 		return nil, &types.ErrUnauthorized{}
@@ -147,8 +194,10 @@ func Sign(host string, message []byte, dkgResultStr string, authData string) (*t
 		return nil, &types.ErrBadRequest{}
 	}
 
-	go tss.Send(signer, ctx, c)
-	go tss.Receive(signer, ctx, c)
+	errs := make(chan error, 2)
+
+	go tss.Send(signer, ctx, errs, c)
+	go tss.Receive(signer, ctx, errs, c)
 
 	// Start signing process
 	signature, err := signer.Process()
@@ -157,19 +206,32 @@ func Sign(host string, message []byte, dkgResultStr string, authData string) (*t
 		return nil, &types.ErrTssProcessFailed{}
 	}
 
+	// Error management
+	processErr := <-errs // wait for websocket closure from server
+	if ctx.Err() == context.Canceled {
+		log.Println("websocket closed by context cancellation:", processErr)
+		return nil, processErr
+	} else if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
+		log.Println("websocket closed normally")
+		cancel()
+	} else {
+		log.Println("error during websocket connection:", processErr) // even if badly closed, we continue as we have the signature
+		cancel()
+	}
+
 	// time.Sleep(time.Second)
 
-	c.Close(websocket.StatusNormalClosure, "")
+	// c.Close(websocket.StatusNormalClosure, "")
 
 	return signature, nil
 }
 
 // Recover recovers the private key from the server and client shares
 // Requires the dkgResult (i.e. client-side of wallet), authData (to confirm authorization and identify user) and host
-func Recover(host string, dkgResultStr string, authData string) (string, error) {
+func Recover(host string, dkgResultStr string, metadata string, authData string) (string, error) {
 
 	// Get temporary access token from server based on auth data
-	token, err := getAccessToken(host, authData)
+	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
 		log.Println("error getting access token:", err)
 		return "", &types.ErrUnauthorized{}
@@ -221,11 +283,11 @@ func Recover(host string, dkgResultStr string, authData string) (string, error) 
 //// UTIL ////
 //////////////
 
-func getAccessToken(host, authData string) (string, error) {
-	return getAuthDataFromServer(host, authData, "/authorize")
+func getAccessToken(host, metadata, authData string) (string, error) {
+	return getAuthDataFromServer(host, authData, metadata, "/authorize")
 }
 
-func getAuthDataFromServer(host, authData, endpoint string) (string, error) {
+func getAuthDataFromServer(host, authData, metadata, endpoint string) (string, error) {
 	_host, err := urlToHttp(host)
 	if err != nil {
 		return "", err
@@ -239,6 +301,8 @@ func getAuthDataFromServer(host, authData, endpoint string) (string, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+authData)
+	req.Header.Set("M-METADATA", metadata)
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Println("error while doing request to", endpoint, ":", err)

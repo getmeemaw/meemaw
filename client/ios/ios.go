@@ -22,7 +22,7 @@ func Identify(host string, authData string) *SwiftResultString {
 }
 
 func Dkg(host string, authData string) *SwiftResultString {
-	dkgResult, err := client.Dkg(host, authData)
+	dkgResult, _, err := client.Dkg(host, authData) // update to return and store metadata
 	if err != nil {
 		swiftResultDkg(nil, err)
 	}
@@ -30,7 +30,7 @@ func Dkg(host string, authData string) *SwiftResultString {
 }
 
 func Sign(host string, message []byte, dkgResultStr string, authData string) *SwiftResultBytes {
-	signature, err := client.Sign(host, message, dkgResultStr, authData)
+	signature, err := client.Sign(host, message, dkgResultStr, "", authData)
 	if err != nil {
 		swiftResultSignature(nil, err)
 	}

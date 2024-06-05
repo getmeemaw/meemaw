@@ -6,7 +6,6 @@ import (
 	elliptic "github.com/getamis/alice/crypto/elliptic"
 	"github.com/getamis/alice/crypto/tss/dkg"
 	"github.com/getamis/alice/types"
-	"google.golang.org/protobuf/proto"
 )
 
 type serviceDkg struct {
@@ -45,18 +44,10 @@ func (p *serviceDkg) Init(pm *PeerManager) error {
 	return nil
 }
 
-func (p *serviceDkg) Handle(msg []byte) error {
-	// log.Printf("Handle msg: %v\n", string(msg))
+func (p *serviceDkg) Handle(msg types.Message) error {
+	// log.Printf("Handle msg: %+v\n", msg)
 
-	data := &dkg.Message{}
-	err := proto.Unmarshal(msg, data)
-	if err != nil {
-		log.Println("Cannot unmarshal data", "err", err)
-		return err
-	}
-
-	err = p.dkg.AddMessage(data.GetId(), data)
-
+	err := p.dkg.AddMessage(msg.GetId(), msg)
 	return err
 }
 
@@ -72,6 +63,7 @@ func (p *serviceDkg) Process() {
 func (p *serviceDkg) OnStateChanged(oldState types.MainState, newState types.MainState) {
 	if newState == types.StateFailed {
 		log.Println("Dkg failed", "old", oldState.String(), "new", newState.String())
+		log.Println("closing done channel")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {
@@ -85,6 +77,7 @@ func (p *serviceDkg) OnStateChanged(oldState types.MainState, newState types.Mai
 		} else {
 			log.Println("Failed to get result from DKG", "err", err)
 		}
+		log.Println("closing done channel")
 		close(p.done)
 		return
 	}

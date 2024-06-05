@@ -12,6 +12,8 @@ import (
 
 	"github.com/getmeemaw/meemaw/client"
 	"github.com/getmeemaw/meemaw/server"
+	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
 	"github.com/google/uuid"
@@ -207,16 +209,20 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 		DevMode:       true,
 	}
 
-	queries := server.New(db)
+	queries := database.New(db)
 
-	_, err := queries.Status(context.Background())
+	vault := vault.NewVault(queries)
+
+	ctx := context.Background()
+
+	_, err := queries.Status(ctx)
 	if err != nil {
 		log.Println("Could not connect to db... ", err)
 		return nil, nil, err
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(queries, &config, logging)
+	_server := server.NewServer(vault, &config, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// // debug : leave time to manually check db status
@@ -234,7 +240,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		err = _server.StoreWallet(parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		_, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
 		if err != nil {
 			log.Println("Error storing wallet:", err)
 			return nil, nil, err
@@ -250,7 +256,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 	log.Println("client.Dkg with host:", host, " and authData:", authData)
 	log.Printf("%q", host)
 
-	dkgResultClient, err := client.Dkg(host, authData)
+	dkgResultClient, _, err := client.Dkg(host, authData) // update to test ret value
 	if err != nil {
 		log.Println("Error client.Dkg:", err)
 		return nil, nil, err
@@ -295,15 +301,19 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 		DevMode:       true,
 	}
 
-	queries := server.New(db)
+	queries := database.New(db)
 
-	_, err := queries.Status(context.Background())
+	vault := vault.NewVault(queries)
+
+	ctx := context.Background()
+
+	_, err := queries.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(queries, &config, logging)
+	_server := server.NewServer(vault, &config, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// Insert wallet in DB (if required)
@@ -317,7 +327,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		err = _server.StoreWallet(parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		_, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
 		if err != nil {
 			return nil, err
 		}
@@ -336,7 +346,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 	log.Println("client.Sign with host:", host, " and authData:", authData)
 	log.Printf("%q", host)
 
-	signature, err := client.Sign(host, []byte("test"), parameters["dkgResultClientStr"], authData)
+	signature, err := client.Sign(host, []byte("test"), parameters["dkgResultClientStr"], "", authData)
 	if err != nil {
 		return nil, err
 	}

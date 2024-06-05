@@ -22,12 +22,14 @@ import (
 	_ "embed"
 )
 
-type contextKey string
+type ContextKey string
 
 // identityMiddleware is a middleware used to get the userId from auth provider based on a generic bearer token provided by the client
 // used by /identify and /authorize
 func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		// Verify https (if not dev mode)
 		if !server._config.DevMode {
 			if r.URL.Scheme != "https" {
@@ -45,17 +47,16 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Get userId from auth provider, based on Bearer token
-		var userId string
-		var err error
-		if f, ok := server.authProviders()[server._config.AuthType]; ok {
-			userId, err = f(getBearerTokenFromHeader(authHeader))
-		} else {
-			log.Println("Problem during the authorization")
-			http.Error(w, "Problem during the authorization", http.StatusBadRequest)
+		// Auth config
+		authConfig, err := server._getAuthConfig(ctx, server)
+		if err != nil {
+			log.Println("Problem getting auth config, err:", err)
+			http.Error(w, "Problem getting auth config", http.StatusBadRequest)
 			return
 		}
 
+		// Get userId from auth provider, based on Bearer token
+		userId, err := server.authProviders(authConfig, getBearerTokenFromHeader(authHeader))
 		if err != nil {
 			log.Println("Problem during the authorization, err:", err)
 			http.Error(w, "Invalid auth token", http.StatusUnauthorized)
@@ -64,8 +65,8 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Store userId in context for next request in the stack
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, contextKey("userId"), userId)
+
+		ctx = context.WithValue(ctx, ContextKey("userId"), userId)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -85,7 +86,7 @@ func (server *Server) ServeWasm(w http.ResponseWriter, r *http.Request) {
 // It uses identityMiddleware to get the userId from auth provider based on a generic bearer token provided by the client, then returns it
 func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value(contextKey("userId")).(string)
+	userId, ok := r.Context().Value(ContextKey("userId")).(string)
 	if !ok {
 		log.Println("Authorization info not found")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -96,20 +97,37 @@ func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(userId))
 }
 
+type tokenParameters struct {
+	userId   string
+	metadata string
+}
+
 // AuthorizeHandler is responsible for creating an access token allowing for a tss request to be performed
 // It uses identityMiddleware to get the userId from auth provider based on a generic bearer token provided by the client
 // It then creates an access token linked to that userId, stores it in cache and returns it
 func (server *Server) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value(contextKey("userId")).(string)
+	userId, ok := r.Context().Value(ContextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	// Create access token and store it in cache
+	// Get metadata from context
+	metadata, ok := r.Context().Value(ContextKey("metadata")).(string)
+	if !ok {
+		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Create access token and store parameters in cache
 	accessToken := uuid.New().String()
-	server._cache.Set(accessToken, userId, cache.DefaultExpiration)
+	params := tokenParameters{
+		userId:   userId,
+		metadata: metadata,
+	}
+
+	server._cache.Set(accessToken, params, cache.DefaultExpiration)
 
 	// Return access token
 	w.Write([]byte(accessToken))
@@ -136,13 +154,13 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Find the userId related to the token in cache
-		userId, found := server._cache.Get(tokenParam[0])
+		paramsInterface, found := server._cache.Get(tokenParam[0])
 		if !found {
 			http.Error(w, "The access token does not exist", http.StatusUnauthorized)
 			return
 		}
 
-		userIdStr, ok := userId.(string)
+		tokenParams, ok := paramsInterface.(tokenParameters)
 		if !ok {
 			http.Error(w, "Issue during authorization", http.StatusBadRequest)
 			return
@@ -150,8 +168,9 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 
 		// Add the userId and token to the context
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, contextKey("userId"), userIdStr)
-		ctx = context.WithValue(ctx, contextKey("token"), tokenParam[0])
+		ctx = context.WithValue(ctx, ContextKey("userId"), tokenParams.userId)
+		ctx = context.WithValue(ctx, ContextKey("metadata"), tokenParams.metadata)
+		ctx = context.WithValue(ctx, ContextKey("token"), tokenParam[0])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -161,13 +180,13 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 // stores the result of dkg in DB (new wallet)
 func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(contextKey("userId")).(string)
+	userId, ok := r.Context().Value(ContextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(contextKey("token")).(string)
+	token, ok := r.Context().Value(ContextKey("token")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -175,7 +194,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if no existing wallet for that user
 	// Note : update when implementing multi-device
-	_, err := server._queries.GetUserByForeignKey(context.Background(), userId)
+	err := server._vault.WalletExists(r.Context(), userId)
 	if err == nil {
 		log.Println("Wallet already exists for that user.")
 		http.Error(w, "Conflict", http.StatusConflict)
@@ -212,37 +231,103 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	go tss.Send(dkg, ctx, c)
-	go tss.Receive(dkg, ctx, c)
+	errs := make(chan error, 2)
+
+	go tss.Send(dkg, ctx, errs, c)
+	go tss.Receive(dkg, ctx, errs, c)
 
 	// Start DKG process.
 	dkgResult, err := dkg.Process()
 	if err != nil {
 		log.Println("Error whil dkg process:", err)
+		c.Close(websocket.StatusInternalError, "dkg process failed")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	// Error management
+	select {
+	case processErr := <-errs:
+		if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
+			log.Println("websocket closed normally") // Should not really happen on server side (server is closing)
+		} else if ctx.Err() == context.Canceled {
+			log.Println("websocket closed by context cancellation:", processErr)
+			c.Close(websocket.StatusInternalError, "dkg process failed")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		} else {
+			log.Println("error during websocket connection:", processErr)
+			c.Close(websocket.StatusInternalError, "dkg process failed")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	default:
+		log.Println("no error during TSS")
+	}
+
+	time.Sleep(time.Second) // let the dkg process finish cleanly on client side
+
+	log.Println("storing dkg results")
+
 	// Store dkgResult
 	userAgent := r.UserAgent()
-	err = server.StoreWallet(userAgent, userId, dkgResult)
+	metadata, err := server._vault.StoreWallet(r.Context(), userAgent, userId, dkgResult) // use context from request
 	if err != nil {
 		log.Println("Error while storing dkg result:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	time.Sleep(time.Second) // let the dkg process finish cleanly on client side
+	log.Println("dkg results stored")
+	log.Println("metadata:", metadata)
 
-	c.Close(websocket.StatusNormalClosure, "")
+	log.Println("closing websocket")
+	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
+	cancel()
 
 	// Delete token from cache to avoid re-use
-	server._cache.Delete(token)
+	// NO : delete after the rest is queried (metadata, cleanup)
+	// server._cache.Delete(token)
+
+	// replace parameters stored for token
+	params := tokenParameters{
+		userId:   userId,
+		metadata: metadata,
+	}
+	server._cache.Replace(token, params, cache.DefaultExpiration) // Add wallet identifier => if client has an issue storing, revert in DB
 
 	// Note: DO NOT return the dkgResult as the client will have its own version with a different share!
+}
+
+// DkgTwoHandler returns the metadata for the Dkg process
+// In the future: verifies that client has been able to store wallet; if not, remove in DB
+// Idea: "validated" status for the wallet, which becomes True after calling DkgTwo; if False, can be overwritten
+func (server *Server) DkgTwoHandler(w http.ResponseWriter, r *http.Request) {
+	token, ok := r.Context().Value(ContextKey("token")).(string)
+	if !ok {
+		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Find the token in cache
+	paramsInterface, found := server._cache.Get(token)
+	if !found {
+		http.Error(w, "The access token does not exist", http.StatusUnauthorized)
+		return
+	}
+
+	tokenParams, ok := paramsInterface.(tokenParameters)
+	if !ok {
+		http.Error(w, "could not unmarshal params", http.StatusBadRequest)
+		return
+	}
+
+	server._cache.Delete(token)
+
+	w.Write([]byte(tokenParams.metadata))
 }
 
 // SignHandler performs the signing process from the server side
@@ -250,14 +335,14 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 // requires a hex-encoded message to be signed (provided in URL parameter)
 func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(contextKey("userId")).(string)
+	userId, ok := r.Context().Value(ContextKey("userId")).(string)
 	if !ok {
 		// If there's no userID in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(contextKey("token")).(string)
+	token, ok := r.Context().Value(ContextKey("token")).(string)
 	if !ok {
 		// If there's no token in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -281,7 +366,7 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve wallet from DB for given userId
-	dkgResult, err := server.RetrieveWallet(userId)
+	dkgResult, err := server._vault.RetrieveWallet(r.Context(), userId) // RetrieveWallet can use metadata from context if required
 	if err != nil {
 		if errors.Is(err, &types.ErrNotFound{}) {
 			http.Error(w, "Wallet does not exist.", http.StatusNotFound)
@@ -325,20 +410,23 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
 
-	go tss.Send(signer, ctx, c)
-	go tss.Receive(signer, ctx, c)
+	errs := make(chan error, 2)
+
+	go tss.Send(signer, ctx, errs, c)
+	go tss.Receive(signer, ctx, errs, c)
 
 	// Start signing process
 	_, err = signer.Process()
 	if err != nil {
 		log.Println("Error launching signer.Process:", err)
+		c.Close(websocket.StatusInternalError, "signing process failed")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	time.Sleep(time.Second) // let the signing process finish cleanly on client side
 
-	c.Close(websocket.StatusNormalClosure, "")
+	c.Close(websocket.StatusNormalClosure, "signing process finished successfully")
 
 	// Delete token from cache to avoid re-use
 	server._cache.Delete(token)
@@ -358,14 +446,14 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(contextKey("userId")).(string)
+	userId, ok := r.Context().Value(ContextKey("userId")).(string)
 	if !ok {
 		// If there's no userID in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(contextKey("token")).(string)
+	token, ok := r.Context().Value(ContextKey("token")).(string)
 	if !ok {
 		// If there's no token in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -386,7 +474,7 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve wallet from DB for given userId
-	dkgResult, err := server.RetrieveWallet(userId)
+	dkgResult, err := server._vault.RetrieveWallet(r.Context(), userId)
 	if err != nil {
 		if errors.Is(err, &types.ErrNotFound{}) {
 			log.Println("Wallet does not exist.")
@@ -472,4 +560,27 @@ func (server *Server) RpcHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+}
+
+const headerPrefix = "M-"
+
+// headerMiddleware is a middleware used to transfer Meemaw headers to context
+func (server *Server) headerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Create a new context from the request context
+		ctx := r.Context()
+
+		// Extract headers with the specific format
+		for name, values := range r.Header {
+			if strings.HasPrefix(name, headerPrefix) && len(values) > 0 {
+				// Remove the prefix and use the remaining part as the context key
+				key := strings.ToLower(strings.TrimPrefix(name, headerPrefix))
+				// Add the first header value to the context
+				ctx = context.WithValue(ctx, ContextKey(key), values[0])
+			}
+		}
+
+		// Pass the context to the next handler in the chain
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

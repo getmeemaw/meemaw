@@ -7,20 +7,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/google/uuid"
 )
 
 func TestAuthorize(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(getCustomAuthHandler()))
 
-	queries := New(nil)
+	queries := database.New(nil)
+
+	vault := vault.NewVault(queries)
+
 	var config = Config{
 		AuthServerUrl: "http://" + authServer.Listener.Addr().String(),
 		AuthType:      "custom",
 		DevMode:       true,
 	}
 
-	_server := NewServer(queries, &config, false)
+	_server := NewServer(vault, &config, false)
 
 	authorizeServer := httptest.NewServer(_server.Router())
 
@@ -40,7 +45,7 @@ func TestAuthorize(t *testing.T) {
 	testDescription = "test 1 (happy path)"
 	_userId = "1d3b3b4f-c4c9-45e6-afe6-41f72e6fd71c"
 
-	token, statusCode, err = requestToken(path, testDescription, authData, true, t)
+	token, statusCode, err = requestToken(path, testDescription, "", authData, true, t)
 	if err == nil {
 		if statusCode == 200 {
 			// verify token format
@@ -64,7 +69,7 @@ func TestAuthorize(t *testing.T) {
 	testDescription = "test 2 (4xx from auth provider)"
 	_userId = "401"
 
-	token, statusCode, err = requestToken(path, testDescription, authData, true, t)
+	token, statusCode, err = requestToken(path, testDescription, "", authData, true, t)
 	if statusCode != 401 {
 		t.Errorf("Failed "+testDescription+": response is not 401 - token:%s - statusCode:%d - err:%s\n", token, statusCode, err)
 	} else {
@@ -81,7 +86,7 @@ func TestAuthorize(t *testing.T) {
 	testDescription = "test 3 (no authorization header)"
 	_userId = "1d3b3b4f-c4c9-45e6-afe6-41f72e6fd71c"
 
-	token, statusCode, err = requestToken(path, testDescription, authData, false, t)
+	token, statusCode, err = requestToken(path, testDescription, "", authData, false, t)
 	if statusCode != 401 {
 		t.Errorf("Failed "+testDescription+": response is not 401 - token:%s - statusCode:%d - err:%s\n", token, statusCode, err)
 	} else {
@@ -98,7 +103,7 @@ func TestAuthorize(t *testing.T) {
 	testDescription = "test 4 (empty authorization header)"
 	_userId = "1d3b3b4f-c4c9-45e6-afe6-41f72e6fd71c"
 
-	token, statusCode, err = requestToken(path, testDescription, "", true, t)
+	token, statusCode, err = requestToken(path, testDescription, "", "", true, t)
 	if statusCode != 401 {
 		t.Errorf("Failed "+testDescription+": response is not 401 - token:%s - statusCode:%d - err:%s\n", token, statusCode, err)
 	} else {
@@ -117,7 +122,7 @@ func TestAuthorize(t *testing.T) {
 // tested through integration tests
 // func TestSign(t *testing.T) {}
 
-func requestToken(path, testDescription, authData string, header bool, t *testing.T) (string, int, error) {
+func requestToken(path, testDescription, metadata, authData string, header bool, t *testing.T) (string, int, error) {
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {
 		log.Println("error while creating new request:", err)
@@ -127,6 +132,7 @@ func requestToken(path, testDescription, authData string, header bool, t *testin
 
 	if header {
 		req.Header.Set("Authorization", "Bearer "+authData)
+		req.Header.Set("M-METADATA", metadata)
 	}
 
 	resp, err := http.DefaultClient.Do(req)

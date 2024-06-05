@@ -12,7 +12,6 @@ import (
 	"github.com/getamis/alice/crypto/tss/dkg"
 	"github.com/getamis/alice/crypto/tss/ecdsa/gg18/signer"
 	"github.com/getamis/alice/types"
-	"google.golang.org/protobuf/proto"
 )
 
 type serviceSigner struct {
@@ -120,18 +119,10 @@ func (p *serviceSigner) Init(pm *PeerManager) error {
 	return nil
 }
 
-func (p *serviceSigner) Handle(msg []byte) error {
+func (p *serviceSigner) Handle(msg types.Message) error {
 	// log.Printf("Handle msg: %v\n", string(msg))
 
-	data := &signer.Message{}
-	err := proto.Unmarshal(msg, data)
-	if err != nil {
-		log.Println("Cannot unmarshal data", "err", err)
-		return err
-	}
-
-	err = p.signer.AddMessage(data.GetId(), data)
-
+	err := p.signer.AddMessage(msg.GetId(), msg)
 	return err
 }
 

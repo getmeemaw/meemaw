@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"log"
@@ -14,7 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/getamis/alice/crypto/ecpointgrouplaw"
 	elliptic_alice "github.com/getamis/alice/crypto/elliptic"
+	"github.com/getamis/alice/crypto/tss/dkg"
+	"github.com/getamis/alice/crypto/tss/ecdsa/gg18/signer"
+	"github.com/getamis/alice/types"
 	"golang.org/x/crypto/sha3"
+	"google.golang.org/protobuf/proto"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 
@@ -27,7 +32,8 @@ type GenericTSS interface {
 	// Process() (*Signature, error)
 	// ProcessStr() (string, error)
 	GetNextMessageToSend() ([]byte, error)
-	HandleMessage([]byte) error
+	HandleMessage(types.Message) error
+	DkgOrSign() int
 }
 
 type PubkeyStr struct {
@@ -120,7 +126,7 @@ func NewServerDkg() (*ServerDkg, error) {
 		return nil, err
 	}
 
-	pm.RegisterHandleMessage(func(msg []byte) error {
+	pm.RegisterHandleMessage(func(msg types.Message) error {
 		return service.Handle(msg)
 	})
 
@@ -166,8 +172,12 @@ func (p *ServerDkg) GetNextMessageToSend() ([]byte, error) {
 	return p.service.pm.GetNextMessageToSend("client")
 }
 
-func (p *ServerDkg) HandleMessage(msg []byte) error {
+func (p *ServerDkg) HandleMessage(msg types.Message) error {
 	return p.service.pm.HandleMessage(msg)
+}
+
+func (p *ServerDkg) DkgOrSign() int {
+	return 1
 }
 
 // Client
@@ -188,7 +198,7 @@ func NewClientDkg() (*ClientDkg, error) {
 		return nil, err
 	}
 
-	pm.RegisterHandleMessage(func(msg []byte) error {
+	pm.RegisterHandleMessage(func(msg types.Message) error {
 		return service.Handle(msg)
 	})
 
@@ -234,8 +244,12 @@ func (p *ClientDkg) GetNextMessageToSend() ([]byte, error) {
 	return p.service.pm.GetNextMessageToSend("server")
 }
 
-func (p *ClientDkg) HandleMessage(msg []byte) error {
+func (p *ClientDkg) HandleMessage(msg types.Message) error {
 	return p.service.pm.HandleMessage(msg)
+}
+
+func (p *ClientDkg) DkgOrSign() int {
+	return 1
 }
 
 ////////////
@@ -280,7 +294,7 @@ func NewServerSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, messa
 		return nil, err
 	}
 
-	pm.RegisterHandleMessage(func(msg []byte) error {
+	pm.RegisterHandleMessage(func(msg types.Message) error {
 		// log.Println("handle message server")
 		return service.Handle(msg)
 	})
@@ -322,9 +336,13 @@ func (p *ServerSigner) GetNextMessageToSend() ([]byte, error) {
 	return p.service.pm.GetNextMessageToSend("client")
 }
 
-func (p *ServerSigner) HandleMessage(msg []byte) error {
+func (p *ServerSigner) HandleMessage(msg types.Message) error {
 	// log.Println("HandleMessage server")
 	return p.service.pm.HandleMessage(msg)
+}
+
+func (p *ServerSigner) DkgOrSign() int {
+	return 2
 }
 
 // Client
@@ -353,7 +371,7 @@ func NewClientSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, messa
 		return nil, err
 	}
 
-	pm.RegisterHandleMessage(func(msg []byte) error {
+	pm.RegisterHandleMessage(func(msg types.Message) error {
 		// log.Println("handle message client")
 		return service.Handle(msg)
 	})
@@ -411,7 +429,7 @@ func (p *ClientSigner) GetNextMessageToSend() ([]byte, error) {
 	return p.service.pm.GetNextMessageToSend("server")
 }
 
-func (p *ClientSigner) HandleMessage(msg []byte) error {
+func (p *ClientSigner) HandleMessage(msg types.Message) error {
 	// log.Println("HandleMessage client")
 	return p.service.pm.HandleMessage(msg)
 }
@@ -421,49 +439,68 @@ func (p *ClientSigner) Test() []byte {
 	return p.service.message
 }
 
+func (p *ClientSigner) DkgOrSign() int {
+	return 2
+}
+
 ///////////////////////
 /// UTILS WEBSOCKET ///
 ///////////////////////
 
-func Receive(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
+func Receive(tss GenericTSS, ctx context.Context, errs chan error, c *websocket.Conn) {
 	// defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
+			log.Println("done receiving because of <-ctx.Done()")
 			return
 		default:
-			// log.Println("starting wsjson read")
 			var v string
 			err := wsjson.Read(ctx, c, &v)
 			if err != nil {
-				if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
-					log.Println("error reading json in receive:", err)
+				if ctx.Err() == context.Canceled {
+					log.Println("read operation canceled")
+					errs <- err
+					return
+				} else {
+					log.Println("error reading message from websocket:", err)
+					log.Println("websocket.CloseStatus(err):", websocket.CloseStatus(err))
+					errs <- err
+					return
 				}
-				return
 			}
 			// log.Printf("Received: %v\n", v)
 
-			byteString, err := hex.DecodeString(v)
+			tssType := tss.DkgOrSign()
+			msg, err := stringToMsg(v, tssType)
 			if err != nil {
-				log.Println("error decoding hex:", err)
+				log.Println("could not convert string to message:", err)
+				errs <- err
 				return
 			}
 
-			tss.HandleMessage(byteString)
+			err = tss.HandleMessage(msg)
+			if err != nil {
+				log.Println("could not handle tss msg:", err)
+				errs <- err
+				return
+			}
 		}
 	}
 }
 
-func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
+func Send(tss GenericTSS, ctx context.Context, errs chan error, c *websocket.Conn) {
 	// defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
+			log.Println("done sending because of <-ctx.Done()")
 			return
 		default:
 			msg, err := tss.GetNextMessageToSend()
 			if err != nil {
 				log.Println("error getting next message:", err)
+				errs <- err
 				return
 			}
 
@@ -475,9 +512,8 @@ func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 				// log.Println("trying to send message:", encodedMsg)
 				err := wsjson.Write(ctx, c, encodedMsg)
 				if err != nil {
-					if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
-						log.Println("error writing json through websocket:", err)
-					}
+					log.Println("error writing json through websocket:", err)
+					errs <- err
 					return
 				}
 			}
@@ -485,6 +521,40 @@ func Send(tss GenericTSS, ctx context.Context, c *websocket.Conn) {
 			time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready
 		}
 	}
+}
+
+func stringToMsg(input string, tssType int) (types.Message, error) {
+	byteString, err := hex.DecodeString(input)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return nil, err
+	}
+
+	var data types.Message
+
+	if tssType == 1 { // dkg
+		dkgData := &dkg.Message{}
+		err = proto.Unmarshal(byteString, dkgData)
+		if err == nil {
+			data = dkgData
+		}
+	} else if tssType == 2 { // sign
+		signData := &signer.Message{}
+		err = proto.Unmarshal(byteString, signData)
+		if err == nil {
+			data = signData
+		}
+	} else {
+		log.Println("unrecognized tss type")
+		return nil, errors.New("unrecognized tss type")
+	}
+
+	if err != nil {
+		log.Println("Cannot unmarshal data", "err", err)
+		return nil, err
+	}
+
+	return data, nil
 }
 
 ///////////////////////

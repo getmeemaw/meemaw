@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.16.0
 
-package server
+package database
 
 import (
 	"encoding/json"

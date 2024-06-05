@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"runtime"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/CAFxX/httpcompression"
+	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/patrickmn/go-cache"
@@ -16,24 +19,43 @@ import (
 )
 
 type Server struct {
-	_queries *Queries
-	_cache   *cache.Cache
-	_config  *Config
-	_router  *chi.Mux
+	_vault         Vault
+	_cache         *cache.Cache
+	_config        *Config
+	_router        *chi.Mux
+	_getAuthConfig func(context.Context, *Server) (*AuthConfig, error)
+}
+
+type Vault interface {
+	WalletExists(context.Context, string) error
+	StoreWallet(context.Context, string, string, *tss.DkgResult) (string, error)
+	RetrieveWallet(context.Context, string) (*tss.DkgResult, error)
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(queries *Queries, config *Config, logging bool) *Server {
+func NewServer(vault Vault, config *Config, logging bool) *Server {
 	server := Server{
-		_queries: queries,
-		_cache:   cache.New(2*time.Minute, 3*time.Minute),
-		_config:  config,
+		_vault:  vault,
+		_cache:  cache.New(2*time.Minute, 3*time.Minute),
+		_config: config,
 	}
 
+	// Auth Config
+	server._getAuthConfig = func(ctx context.Context, server *Server) (*AuthConfig, error) {
+		return &AuthConfig{
+			AuthType:       server._config.AuthType,
+			AuthServerUrl:  server._config.AuthServerUrl,
+			SupabaseUrl:    server._config.SupabaseUrl,
+			SupabaseApiKey: server._config.SupabaseApiKey,
+		}, nil
+	}
+
+	// Router
+
 	_cors := cors.New(cors.Options{
-		AllowedOrigins:   []string{server._config.ClientOrigin},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedOrigins: []string{server._config.ClientOrigin},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		// AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -46,6 +68,8 @@ func NewServer(queries *Queries, config *Config, logging bool) *Server {
 		r.Use(middleware.Logger)
 	}
 	r.Use(_cors.Handler)
+	// r.Use(cors.Default().Handler)
+	r.Use(server.headerMiddleware)
 
 	// debug rpc
 	r.HandleFunc("/rpc", server.RpcHandler)
@@ -61,6 +85,7 @@ func NewServer(queries *Queries, config *Config, logging bool) *Server {
 	r.With(server.identityMiddleware).Get("/identify", server.IdentifyHandler)
 	r.With(server.identityMiddleware).Get("/authorize", server.AuthorizeHandler)
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
+	r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
 	r.With(server.authMiddleware).Post("/recover", server.RecoverHandler)
 
@@ -74,6 +99,29 @@ func (server *Server) Router() http.Handler {
 	return server._router
 }
 
+// Vault returns the vault of the server (useful for tests)
+func (server *Server) Vault() Vault {
+	return server._vault
+}
+
+// UpdateGetAuthConfig changes the auth config getter
+func (server *Server) UpdateGetAuthConfig(getAuthConfig func(context.Context, *Server) (*AuthConfig, error)) {
+	server._getAuthConfig = getAuthConfig
+}
+
+// AddRoute adds an endpoint to the server. Note that it will go through authMiddleware for security reasons.
+func (server *Server) AddRoute(method string, pattern string, h http.HandlerFunc) error {
+	if strings.ToLower(method) == "get" {
+		server._router.With(server.authMiddleware).Get(pattern, h)
+		return nil
+	} else if strings.ToLower(method) == "post" {
+		server._router.With(server.authMiddleware).Post(pattern, h)
+		return nil
+	} else {
+		return errors.New("method not recognized")
+	}
+}
+
 // Start starts the web server on given port
 func (server *Server) Start() {
 	log.Println("Starting server on port", server._config.Port)
@@ -85,18 +133,6 @@ func (server *Server) Start() {
 			log.Fatal("Server not in dev mode and not all targets are https")
 		}
 
-		// Check that auth config is complete
-		if server._config.AuthType == "supabase" {
-			if len(server._config.SupabaseApiKey) == 0 || len(server._config.SupabaseUrl) == 0 {
-				log.Fatal("Missing Supabase config")
-			}
-		} else if server._config.AuthType == "custom" {
-			if len(server._config.AuthServerUrl) == 0 {
-				log.Fatal("Missing custom auth url")
-			}
-		} else {
-			log.Fatal("Unknown auth")
-		}
 	}
 
 	if runtime.GOOS == "darwin" {

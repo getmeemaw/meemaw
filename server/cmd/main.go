@@ -9,6 +9,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/getmeemaw/meemaw/server"
+	"github.com/getmeemaw/meemaw/server/database"
+	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -39,7 +41,10 @@ func main() {
 	defer db.Close()
 
 	// load sqlc queries
-	queries := server.New(db)
+	queries := database.New(db)
+
+	// load vault
+	vault := vault.NewVault(queries)
 
 	// verify db connexion for good measure
 	_, err = queries.Status(context.Background())
@@ -52,7 +57,7 @@ func main() {
 	_, err = queries.GetFirstUser(context.Background())
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("Schema does not exist, creating...")
-		err = server.LoadSchema(db)
+		err = server.LoadSchema(db, "")
 		if err != nil {
 			log.Fatalf("Could not load schema: %s", err)
 		} else {
@@ -63,7 +68,7 @@ func main() {
 	}
 
 	// create server based on queries and config
-	server := server.NewServer(queries, config, logging)
+	server := server.NewServer(vault, config, logging)
 
 	// start server
 	server.Start()
