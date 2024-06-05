@@ -222,7 +222,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(vault, &config, logging)
+	_server := server.NewServer(vault, &config, nil, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// // debug : leave time to manually check db status
@@ -313,7 +313,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 	}
 	log.Println("Connected to db")
 
-	_server := server.NewServer(vault, &config, logging)
+	_server := server.NewServer(vault, &config, nil, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
 	// Insert wallet in DB (if required)

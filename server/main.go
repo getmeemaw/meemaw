@@ -22,6 +22,7 @@ type Server struct {
 	_vault         Vault
 	_cache         *cache.Cache
 	_config        *Config
+	_wasm          []byte
 	_router        *chi.Mux
 	_getAuthConfig func(context.Context, *Server) (*AuthConfig, error)
 }
@@ -33,11 +34,12 @@ type Vault interface {
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
-func NewServer(vault Vault, config *Config, logging bool) *Server {
+func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Server {
 	server := Server{
 		_vault:  vault,
 		_cache:  cache.New(2*time.Minute, 3*time.Minute),
 		_config: config,
+		_wasm:   wasmBinary,
 	}
 
 	// Auth Config

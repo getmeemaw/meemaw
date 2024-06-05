@@ -14,7 +14,14 @@ import (
 	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	_ "embed"
 )
+
+//go:generate bash -c "GOOS=js GOARCH=wasm go build -o meemaw.wasm ../../client/web/wasm/main.go"
+
+//go:embed meemaw.wasm
+var wasmBinary []byte
 
 func main() {
 	// check if logging should be enabled or disabled
@@ -68,7 +75,7 @@ func main() {
 	}
 
 	// create server based on queries and config
-	server := server.NewServer(vault, config, logging)
+	server := server.NewServer(vault, config, wasmBinary, logging)
 
 	// start server
 	server.Start()
