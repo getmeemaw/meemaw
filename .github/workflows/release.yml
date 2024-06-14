@@ -151,8 +151,14 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add .
-          git commit -m "Update SDK"
-          git push
+          
+          # Check if there are any changes to commit
+          if git diff-index --quiet HEAD --; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update SDK"
+            git push
+          fi
       
       # zip & upload to github as github release
 
