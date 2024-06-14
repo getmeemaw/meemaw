@@ -4,9 +4,7 @@
 
 package database
 
-import (
-	"encoding/json"
-)
+import ()
 
 type Device struct {
 	ID        int64
@@ -21,9 +19,9 @@ type User struct {
 }
 
 type Wallet struct {
-	ID            int64
-	UserID        int64
-	PublicAddress string
-	Share         string
-	Params        json.RawMessage
+	ID                  int64
+	UserID              int64
+	PublicAddress       string
+	EncryptedDkgResults []byte
+	Nonce               []byte
 }

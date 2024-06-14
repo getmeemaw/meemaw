@@ -9,8 +9,8 @@ CREATE TABLE wallets (
     id BIGSERIAL PRIMARY KEY,
     user_id bigint NOT NULL REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     public_address text NOT NULL DEFAULT '',
-    share text NOT NULL DEFAULT '',
-    params jsonb NOT NULL
+    encrypted_dkg_results bytea NOT NULL DEFAULT E'\\x',
+    nonce bytea NOT NULL DEFAULT E'\\x'
 );
 
 -- CREATE UNIQUE INDEX wallet_identifier ON public.wallets USING btree (user_id, public_address);

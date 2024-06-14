@@ -256,11 +256,13 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 	log.Println("client.Dkg with host:", host, " and authData:", authData)
 	log.Printf("%q", host)
 
-	dkgResultClient, _, err := client.Dkg(host, authData) // update to test ret value
+	dkgResultClient, clientKeyClient, err := client.Dkg(host, authData) // update to test ret value
 	if err != nil {
 		log.Println("Error client.Dkg:", err)
 		return nil, nil, err
 	}
+
+	log.Println("clientKeyClient:", clientKeyClient)
 
 	// // debug : leave time to manually check db status
 	// log.Println("wallet stored, check in db !")
@@ -268,23 +270,12 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 	time.Sleep(1 * time.Second) // Give it 1 second to make sure it's in DB. Sometimes the test fails because of race conditions.
 
-	res, err := queries.GetUserSigningParameters(context.Background(), parameters["userIdUsed"])
-	if err != nil {
-		log.Println("Error getting user signing parameters:", err)
-		return nil, nil, err
-	}
+	ctx = context.WithValue(ctx, types.ContextKey("metadata"), clientKeyClient)
 
-	var signingParamsServer tss.SigningParameters
-	err = json.Unmarshal(res.Params.RawMessage, &signingParamsServer)
+	dkgResultServer, err := _server.Vault().RetrieveWallet(ctx, parameters["userIdStored"])
 	if err != nil {
+		log.Println("Error retrieveWallet:", err)
 		return nil, nil, err
-	}
-
-	dkgResultServer := &tss.DkgResult{
-		Pubkey:  signingParamsServer.Pubkey,
-		BKs:     signingParamsServer.BKs,
-		Share:   res.Share.String,
-		Address: res.PublicAddress.String,
 	}
 
 	return dkgResultClient, dkgResultServer, nil
@@ -316,6 +307,8 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 	_server := server.NewServer(vault, &config, nil, logging)
 	// _server.Start() // No need to start, we test the handler directly
 
+	var metadata string
+
 	// Insert wallet in DB (if required)
 	if len(parameters["dkgResultServerStr"]) > 0 {
 		var dkgResultServer tss.DkgResult
@@ -327,7 +320,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		_, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		metadata, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
 		if err != nil {
 			return nil, err
 		}
@@ -346,7 +339,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 	log.Println("client.Sign with host:", host, " and authData:", authData)
 	log.Printf("%q", host)
 
-	signature, err := client.Sign(host, []byte("test"), parameters["dkgResultClientStr"], "", authData)
+	signature, err := client.Sign(host, []byte("test"), parameters["dkgResultClientStr"], metadata, authData)
 	if err != nil {
 		return nil, err
 	}
