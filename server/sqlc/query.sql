@@ -10,8 +10,8 @@ ON CONFLICT DO NOTHING
 RETURNING *;
 
 -- name: AddWallet :one
-INSERT INTO wallets (user_id, public_address, share, params)
-VALUES (sqlc.arg('UserId'), sqlc.arg('PublicAddress'), sqlc.arg('Share'), sqlc.arg('Params'))
+INSERT INTO wallets (user_id, public_address, encrypted_dkg_results, nonce)
+VALUES (sqlc.arg('UserId'), sqlc.arg('PublicAddress'), sqlc.arg('EncryptedDkgResults'), sqlc.arg('Nonce'))
 ON CONFLICT DO NOTHING
 RETURNING *;
 

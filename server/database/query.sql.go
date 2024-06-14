@@ -8,9 +8,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-
-	"github.com/tabbed/pqtype"
 )
 
 const addDevice = `-- name: AddDevice :one
@@ -55,33 +52,33 @@ func (q *Queries) AddUser(ctx context.Context, foreignKey string) (User, error) 
 }
 
 const addWallet = `-- name: AddWallet :one
-INSERT INTO wallets (user_id, public_address, share, params)
+INSERT INTO wallets (user_id, public_address, encrypted_dkg_results, nonce)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
-RETURNING id, user_id, public_address, share, params
+RETURNING id, user_id, public_address, encrypted_dkg_results, nonce
 `
 
 type AddWalletParams struct {
-	UserId        int64
-	PublicAddress string
-	Share         string
-	Params        json.RawMessage
+	UserId              int64
+	PublicAddress       string
+	EncryptedDkgResults []byte
+	Nonce               []byte
 }
 
 func (q *Queries) AddWallet(ctx context.Context, arg AddWalletParams) (Wallet, error) {
 	row := q.db.QueryRowContext(ctx, addWallet,
 		arg.UserId,
 		arg.PublicAddress,
-		arg.Share,
-		arg.Params,
+		arg.EncryptedDkgResults,
+		arg.Nonce,
 	)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PublicAddress,
-		&i.Share,
-		&i.Params,
+		&i.EncryptedDkgResults,
+		&i.Nonce,
 	)
 	return i, err
 }
@@ -161,18 +158,18 @@ func (q *Queries) GetUserDevices(ctx context.Context, userid int64) ([]Device, e
 }
 
 const getUserSigningParameters = `-- name: GetUserSigningParameters :one
-SELECT wallets.id, wallets.user_id, wallets.public_address, wallets.share, wallets.params
+SELECT wallets.id, wallets.user_id, wallets.public_address, wallets.encrypted_dkg_results, wallets.nonce
 FROM users
 LEFT JOIN wallets ON users.id = wallets.user_id
 WHERE users.foreign_key = $1
 `
 
 type GetUserSigningParametersRow struct {
-	ID            sql.NullInt64
-	UserID        sql.NullInt64
-	PublicAddress sql.NullString
-	Share         sql.NullString
-	Params        pqtype.NullRawMessage
+	ID                  sql.NullInt64
+	UserID              sql.NullInt64
+	PublicAddress       sql.NullString
+	EncryptedDkgResults []byte
+	Nonce               []byte
 }
 
 func (q *Queries) GetUserSigningParameters(ctx context.Context, foreignkey string) (GetUserSigningParametersRow, error) {
@@ -182,14 +179,14 @@ func (q *Queries) GetUserSigningParameters(ctx context.Context, foreignkey strin
 		&i.ID,
 		&i.UserID,
 		&i.PublicAddress,
-		&i.Share,
-		&i.Params,
+		&i.EncryptedDkgResults,
+		&i.Nonce,
 	)
 	return i, err
 }
 
 const getUserWallets = `-- name: GetUserWallets :many
-SELECT id, user_id, public_address, share, params FROM wallets
+SELECT id, user_id, public_address, encrypted_dkg_results, nonce FROM wallets
 WHERE user_id = $1
 `
 
@@ -206,8 +203,8 @@ func (q *Queries) GetUserWallets(ctx context.Context, userid int64) ([]Wallet, e
 			&i.ID,
 			&i.UserID,
 			&i.PublicAddress,
-			&i.Share,
-			&i.Params,
+			&i.EncryptedDkgResults,
+			&i.Nonce,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +220,7 @@ func (q *Queries) GetUserWallets(ctx context.Context, userid int64) ([]Wallet, e
 }
 
 const getWalletByAddress = `-- name: GetWalletByAddress :one
-SELECT id, user_id, public_address, share, params FROM wallets
+SELECT id, user_id, public_address, encrypted_dkg_results, nonce FROM wallets
 WHERE public_address = $1
 `
 
@@ -234,8 +231,8 @@ func (q *Queries) GetWalletByAddress(ctx context.Context, publicaddress string) 
 		&i.ID,
 		&i.UserID,
 		&i.PublicAddress,
-		&i.Share,
-		&i.Params,
+		&i.EncryptedDkgResults,
+		&i.Nonce,
 	)
 	return i, err
 }

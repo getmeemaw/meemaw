@@ -15,7 +15,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/patrickmn/go-cache"
-	"github.com/rs/cors"
 )
 
 type Server struct {
@@ -54,22 +53,13 @@ func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Se
 
 	// Router
 
-	_cors := cors.New(cors.Options{
-		AllowedOrigins: []string{server._config.ClientOrigin},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		// AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	})
-
 	r := chi.NewRouter()
 
 	// global middlewares
 	if logging {
 		r.Use(middleware.Logger)
 	}
-	r.Use(_cors.Handler)
+	r.Use(server.corsMiddleware)
 	// r.Use(cors.Default().Handler)
 	r.Use(server.headerMiddleware)
 
@@ -153,4 +143,19 @@ type Config struct {
 	AuthServerUrl   string
 	SupabaseUrl     string
 	SupabaseApiKey  string
+}
+
+func (server *Server) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", server._config.ClientOrigin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, M-METADATA")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

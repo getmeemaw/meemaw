@@ -20,8 +20,6 @@ import (
 	"nhooyr.io/websocket"
 )
 
-type ContextKey string
-
 // identityMiddleware is a middleware used to get the userId from auth provider based on a generic bearer token provided by the client
 // used by /identify and /authorize
 func (server *Server) identityMiddleware(next http.Handler) http.Handler {
@@ -64,7 +62,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 
 		// Store userId in context for next request in the stack
 
-		ctx = context.WithValue(ctx, ContextKey("userId"), userId)
+		ctx = context.WithValue(ctx, types.ContextKey("userId"), userId)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -72,6 +70,7 @@ func (server *Server) identityMiddleware(next http.Handler) http.Handler {
 // ServeWasm is responsible for serving the wasm module
 func (server *Server) ServeWasm(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/wasm")
+	w.Header().Set("Access-Control-Allow-Origin", server._config.ClientOrigin)
 	w.Write(server._wasm)
 }
 
@@ -79,7 +78,7 @@ func (server *Server) ServeWasm(w http.ResponseWriter, r *http.Request) {
 // It uses identityMiddleware to get the userId from auth provider based on a generic bearer token provided by the client, then returns it
 func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value(ContextKey("userId")).(string)
+	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
 		log.Println("Authorization info not found")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -100,14 +99,14 @@ type tokenParameters struct {
 // It then creates an access token linked to that userId, stores it in cache and returns it
 func (server *Server) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
-	userId, ok := r.Context().Value(ContextKey("userId")).(string)
+	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
 	// Get metadata from context
-	metadata, ok := r.Context().Value(ContextKey("metadata")).(string)
+	metadata, ok := r.Context().Value(types.ContextKey("metadata")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -161,9 +160,9 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 
 		// Add the userId and token to the context
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, ContextKey("userId"), tokenParams.userId)
-		ctx = context.WithValue(ctx, ContextKey("metadata"), tokenParams.metadata)
-		ctx = context.WithValue(ctx, ContextKey("token"), tokenParam[0])
+		ctx = context.WithValue(ctx, types.ContextKey("userId"), tokenParams.userId)
+		ctx = context.WithValue(ctx, types.ContextKey("metadata"), tokenParams.metadata)
+		ctx = context.WithValue(ctx, types.ContextKey("token"), tokenParam[0])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -173,13 +172,13 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 // stores the result of dkg in DB (new wallet)
 func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(ContextKey("userId")).(string)
+	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(ContextKey("token")).(string)
+	token, ok := r.Context().Value(types.ContextKey("token")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -299,7 +298,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 // In the future: verifies that client has been able to store wallet; if not, remove in DB
 // Idea: "validated" status for the wallet, which becomes True after calling DkgTwo; if False, can be overwritten
 func (server *Server) DkgTwoHandler(w http.ResponseWriter, r *http.Request) {
-	token, ok := r.Context().Value(ContextKey("token")).(string)
+	token, ok := r.Context().Value(types.ContextKey("token")).(string)
 	if !ok {
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
@@ -328,14 +327,14 @@ func (server *Server) DkgTwoHandler(w http.ResponseWriter, r *http.Request) {
 // requires a hex-encoded message to be signed (provided in URL parameter)
 func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(ContextKey("userId")).(string)
+	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
 		// If there's no userID in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(ContextKey("token")).(string)
+	token, ok := r.Context().Value(types.ContextKey("token")).(string)
 	if !ok {
 		// If there's no token in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -439,14 +438,14 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get userId and access token from context
-	userId, ok := r.Context().Value(ContextKey("userId")).(string)
+	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
 		// If there's no userID in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
 
-	token, ok := r.Context().Value(ContextKey("token")).(string)
+	token, ok := r.Context().Value(types.ContextKey("token")).(string)
 	if !ok {
 		// If there's no token in the context, report an error and return.
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
@@ -569,7 +568,7 @@ func (server *Server) headerMiddleware(next http.Handler) http.Handler {
 				// Remove the prefix and use the remaining part as the context key
 				key := strings.ToLower(strings.TrimPrefix(name, headerPrefix))
 				// Add the first header value to the context
-				ctx = context.WithValue(ctx, ContextKey(key), values[0])
+				ctx = context.WithValue(ctx, types.ContextKey(key), values[0])
 			}
 		}
 
