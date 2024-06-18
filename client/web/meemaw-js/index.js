@@ -118,11 +118,13 @@ export default class Meemaw {
 
         // Else, DKG
         try {
-            const combinedResult = await window.Dkg(this.host, authData);
+            const resp = await window.Dkg(this.host, authData);
+            const parsedResp = JSON.parse(resp);
 
-            const [metadata, newDkgResult] = combinedResult.split("&&");
+            const metadata = parsedResp.metadata;
+            const parsedDkgResult = parsedResp.dkgResult;
 
-            const parsedDkgResult = JSON.parse(newDkgResult);
+            const newDkgResult = JSON.stringify(parsedDkgResult);
             const addr = parsedDkgResult.Address;
 
             this.storeDkgResults(userId, newDkgResult, addr, metadata);
