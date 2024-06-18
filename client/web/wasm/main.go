@@ -11,6 +11,7 @@ import (
 	"syscall/js"
 
 	"github.com/getmeemaw/meemaw/client"
+	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/tx"
 )
 
@@ -48,6 +49,11 @@ func Identify(this js.Value, args []js.Value) (any, error) {
 	return string(userId), err
 }
 
+type dkgResponse struct {
+	DkgResult *tss.DkgResult `json:"dkgResult"`
+	Metadata  string         `json:"metadata"`
+}
+
 // input : host, authData
 // output : json encoded dkgResult, error
 func Dkg(this js.Value, args []js.Value) (any, error) {
@@ -60,13 +66,18 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 		return nil, err
 	}
 
-	dkgResultJSON, err := json.Marshal(dkgResult)
+	resp := dkgResponse{
+		DkgResult: dkgResult,
+		Metadata:  metadata,
+	}
+
+	respJSON, err := json.Marshal(resp)
 	if err != nil {
 		log.Println("error while marshaling dkgresult json:", err)
 		return nil, err
 	}
 
-	return metadata + "&&" + string(dkgResultJSON), err
+	return string(respJSON), err
 }
 
 // input : host, message (hex encoded bytes), dkgResultStr, authData
