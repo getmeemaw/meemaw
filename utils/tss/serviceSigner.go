@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/getamis/alice/crypto/birkhoffinterpolation"
-	elliptic "github.com/getamis/alice/crypto/elliptic"
 	"github.com/getamis/alice/crypto/homo/paillier"
 	"github.com/getamis/alice/crypto/tss/dkg"
 	"github.com/getamis/alice/crypto/tss/ecdsa/gg18/signer"
@@ -21,20 +20,18 @@ type serviceSigner struct {
 	share   string
 	BKs     map[string]BK
 	message []byte
-	curve   elliptic.Curve
 	done    chan struct{}
 	result  *signer.Result
 	err     error
 }
 
-func NewServiceSigner(pubkey *Pubkey, share string, BKs map[string]BK, message []byte, curve elliptic.Curve) *serviceSigner {
+func NewServiceSigner(pubkey *Pubkey, share string, BKs map[string]BK, message []byte) *serviceSigner {
 	s := &serviceSigner{
 		// pm:   pm,
 		pubkey:  pubkey,
 		share:   share,
 		BKs:     BKs,
 		message: message,
-		curve:   curve,
 		done:    make(chan struct{}),
 	}
 
@@ -47,7 +44,7 @@ var (
 )
 
 // ConvertDKGResult converts DKG result from config.
-func ConvertDKGResult(k *Pubkey, cfgShare string, cfgBKs map[string]BK, curve elliptic.Curve) (*dkg.Result, error) {
+func ConvertDKGResult(k *Pubkey, cfgShare string, cfgBKs map[string]BK) (*dkg.Result, error) {
 	// Build public key.
 	// x, ok := new(big.Int).SetString(cfgPubkey.X, 10)
 	// if !ok {
@@ -95,7 +92,7 @@ func (p *serviceSigner) Init(pm *PeerManager) error {
 	p.pm = pm
 
 	// Signer needs results from DKG.
-	dkgResult, err := ConvertDKGResult(p.pubkey, p.share, p.BKs, p.curve)
+	dkgResult, err := ConvertDKGResult(p.pubkey, p.share, p.BKs)
 	if err != nil {
 		log.Println("Cannot get DKG result", "err", err)
 		return err

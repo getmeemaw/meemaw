@@ -276,14 +276,12 @@ type ServerSigner struct {
 func NewServerSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ServerSigner, error) {
 	// will probably need a wrapper with JSON input
 
-	curve := elliptic_alice.Secp256k1()
-
 	pubkey, err := NewPubkey(pubkeyStr)
 	if err != nil {
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message, curve)
+	service := NewServiceSigner(pubkey, share, BKs, message)
 
 	pm := NewPeerManager("server")
 	pm.AddPeer("client")
@@ -353,14 +351,12 @@ type ClientSigner struct {
 func NewClientSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ClientSigner, error) {
 	// will probably need a wrapper with JSON input
 
-	curve := elliptic_alice.Secp256k1()
-
 	pubkey, err := NewPubkey(pubkeyStr)
 	if err != nil {
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message, curve)
+	service := NewServiceSigner(pubkey, share, BKs, message)
 
 	pm := NewPeerManager("client")
 	pm.AddPeer("server")
@@ -737,7 +733,7 @@ func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, client
 		return nil, err
 	}
 
-	dkgResultServer, err := ConvertDKGResult(pubkey, serverShareStr, BKs, curve)
+	dkgResultServer, err := ConvertDKGResult(pubkey, serverShareStr, BKs)
 	if err != nil {
 		return nil, err
 	}
