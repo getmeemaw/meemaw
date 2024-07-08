@@ -107,7 +107,7 @@ func (vault *Vault) RetrieveWallet(ctx context.Context, foreignKey string) (*tss
 
 	clientKey, err := hex.DecodeString(clientKeyStr)
 	if err != nil {
-		log.Println("error hex decoding clientKey")
+		log.Println("error hex decoding clientKey(", clientKeyStr, "):", err)
 		return nil, err
 	}
 

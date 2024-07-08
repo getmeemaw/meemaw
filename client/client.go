@@ -125,6 +125,8 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	metadata := string(body)
 
+	log.Println("client.go dkg - metadata:", metadata)
+
 	// time.Sleep(120 * time.Hour) // debug
 
 	// c.Close(websocket.StatusNormalClosure, "")

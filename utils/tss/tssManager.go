@@ -28,6 +28,15 @@ import (
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 )
 
+const _rank uint32 = 0
+const _threshold uint32 = 2
+
+const _clientID = "client"
+const _serverID = "server"
+
+const AddExistingClientID = "client"
+const AddNewClientID = "new-client"
+
 type GenericTSS interface {
 	// Process() (*Signature, error)
 	// ProcessStr() (string, error)
@@ -109,16 +118,17 @@ type DkgResult struct {
 	Address string
 }
 
+// Server
+
 type ServerDkg struct {
 	service *serviceDkg
 }
 
-// Server
 func NewServerDkg() (*ServerDkg, error) {
-	service := NewServiceDkg(2, 0, elliptic_alice.Secp256k1())
+	service := NewServiceDkg(_threshold, _rank, elliptic_alice.Secp256k1())
 
-	pm := NewPeerManager("server")
-	pm.AddPeer("client")
+	pm := NewPeerManager(_serverID)
+	pm.AddPeer(_clientID)
 
 	err := service.Init(pm)
 	if err != nil {
@@ -169,7 +179,7 @@ func (p *ServerDkg) Process() (*DkgResult, error) {
 }
 
 func (p *ServerDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("client")
+	return p.service.pm.GetNextMessageToSend(_clientID)
 }
 
 func (p *ServerDkg) HandleMessage(msg types.Message) error {
@@ -185,12 +195,11 @@ type ClientDkg struct {
 	service *serviceDkg
 }
 
-// Server
 func NewClientDkg() (*ClientDkg, error) {
-	service := NewServiceDkg(2, 0, elliptic_alice.Secp256k1())
+	service := NewServiceDkg(_threshold, _rank, elliptic_alice.Secp256k1())
 
-	pm := NewPeerManager("client")
-	pm.AddPeer("server")
+	pm := NewPeerManager(_clientID)
+	pm.AddPeer(_serverID)
 
 	err := service.Init(pm)
 	if err != nil {
@@ -241,7 +250,7 @@ func (p *ClientDkg) Process() (*DkgResult, error) {
 }
 
 func (p *ClientDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("server")
+	return p.service.pm.GetNextMessageToSend(_serverID)
 }
 
 func (p *ClientDkg) HandleMessage(msg types.Message) error {
@@ -283,8 +292,8 @@ func NewServerSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, messa
 
 	service := NewServiceSigner(pubkey, share, BKs, message)
 
-	pm := NewPeerManager("server")
-	pm.AddPeer("client")
+	pm := NewPeerManager(_serverID)
+	pm.AddPeer(_clientID)
 
 	err = service.Init(pm)
 	if err != nil {
@@ -331,7 +340,7 @@ func (p *ServerSigner) Process() (*Signature, error) {
 }
 
 func (p *ServerSigner) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("client")
+	return p.service.pm.GetNextMessageToSend(_clientID)
 }
 
 func (p *ServerSigner) HandleMessage(msg types.Message) error {
@@ -358,8 +367,8 @@ func NewClientSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, messa
 
 	service := NewServiceSigner(pubkey, share, BKs, message)
 
-	pm := NewPeerManager("client")
-	pm.AddPeer("server")
+	pm := NewPeerManager(_clientID)
+	pm.AddPeer(_serverID)
 
 	err = service.Init(pm)
 	if err != nil {
@@ -422,7 +431,7 @@ func (p *ClientSigner) Process() (*Signature, error) {
 // }
 
 func (p *ClientSigner) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("server")
+	return p.service.pm.GetNextMessageToSend(_serverID)
 }
 
 func (p *ClientSigner) HandleMessage(msg types.Message) error {
@@ -748,12 +757,12 @@ func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, client
 
 	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
 		share: dkgResultServer.Share,
-		bk:    dkgResultServer.Bks["server"],
+		bk:    dkgResultServer.Bks[_serverID],
 	})
 
 	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
 		share: clientShare,
-		bk:    dkgResultServer.Bks["client"],
+		bk:    dkgResultServer.Bks[_clientID],
 	})
 
 	return RecoverPrivateKey(curve, 2, ECPoint, RecoveryPeers)

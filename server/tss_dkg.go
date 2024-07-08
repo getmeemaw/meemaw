@@ -109,7 +109,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	time.Sleep(time.Second) // let the dkg process finish cleanly on client side
 
-	log.Println("storing dkg results")
+	log.Println("dkgHandler - storing dkg results")
 
 	// Store dkgResult
 	userAgent := r.UserAgent()
@@ -120,8 +120,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("dkg results stored")
-	log.Println("metadata:", metadata)
+	log.Println("dkgHandler - dkg results stored")
+	log.Println("dkgHandler - metadata:", metadata)
 
 	log.Println("closing websocket")
 	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
@@ -170,6 +170,8 @@ func (server *Server) DkgTwoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server._cache.Delete(token)
+
+	log.Println("dkgtwo - metadata:", tokenParams.metadata)
 
 	w.Write([]byte(tokenParams.metadata))
 }
