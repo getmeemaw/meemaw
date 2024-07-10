@@ -611,7 +611,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	}()
 
 	// Start adder
-	err = adder.Process() // UPDATE RETURN
+	newDkgResult, err := adder.Process() // UPDATE RETURN
 	if err != nil {
 		log.Println("error processing adder:", err)
 		errs <- err
@@ -665,6 +665,11 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	cancel()
 
 	log.Println("AcceptDevice serverDone")
+
+	log.Println("")
+
+	log.Println("AcceptDevice - old dkgResult:", dkgResult)
+	log.Println("AcceptDevice - new dkgResult:", newDkgResult)
 
 	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
 

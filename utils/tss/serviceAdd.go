@@ -327,16 +327,39 @@ func (p *ExistingClientAdd) GetDoneChan() chan struct{} {
 	return p.service.GetDoneChan()
 }
 
-func (p *ExistingClientAdd) Process() error { // Update to have result that makes sense
+func (p *ExistingClientAdd) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return fmt.Errorf("could not get server signer results")
+		return nil, errors.New("could not get client dkg results")
 	}
 
-	log.Println("ExistingClientAdd result:", p.service.result)
+	pubkey := Pubkey{
+		X: p.service.result.PublicKey.GetX(),
+		Y: p.service.result.PublicKey.GetY(),
+	}
+	share := p.service.result.Share.String()
+	BKs := make(map[string]BK)
 
-	return nil
+	addr := pubkey.GetAddress().Hex()
+	pubkeyStr := pubkey.GetStr()
+
+	// Build bks.
+	for peerID, bk := range p.service.result.Bks {
+		BKs[peerID] = BK{
+			X:    bk.GetX().String(),
+			Rank: bk.GetRank(),
+		}
+	}
+
+	dkgResult := DkgResult{
+		Pubkey:  pubkeyStr,
+		BKs:     BKs,
+		Share:   share,
+		Address: addr,
+	}
+
+	return &dkgResult, nil
 }
 
 func (p *ExistingClientAdd) GetNextMessageToSend(peerID string) ([]byte, error) {
@@ -414,7 +437,7 @@ func (p *ClientAdd) GetDoneChan() chan struct{} {
 	return p.service.GetDoneChan()
 }
 
-func (p *ClientAdd) Process() (*DkgResult, error) { // Update to have result that makes sense
+func (p *ClientAdd) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
