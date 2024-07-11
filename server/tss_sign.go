@@ -62,8 +62,10 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	clientPeerID := "client" // UPDATE : get it from client
+
 	// Prepare signing process
-	signer, err := tss.NewServerSigner(dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs, message)
+	signer, err := tss.NewServerSigner(clientPeerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs, message)
 	if err != nil {
 		log.Println("Error initialising signer tss:", err)
 		if strings.Contains(err.Error(), "invalid point") {

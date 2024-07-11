@@ -44,8 +44,10 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clientPeerID := "client" // UPDATE : get it from client
+
 	// Prepare DKG process
-	dkg, err := tss.NewServerDkg()
+	dkg, err := tss.NewServerDkg(clientPeerID)
 	if err != nil {
 		log.Println("Error when creating new server dkg:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

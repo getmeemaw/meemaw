@@ -23,6 +23,7 @@ type MessageType struct { // should be in utils/ws.go ? (with the rest below)
 }
 
 var (
+	PeerIdBroadcastMessage        = MessageType{MsgType: "peer", MsgStage: 10}
 	DeviceMessage                 = MessageType{MsgType: "device", MsgStage: 20}       // new device to server (=> respond with pubkey)
 	PubkeyMessage                 = MessageType{MsgType: "pubkey", MsgStage: 20}       // server to new device (=> start TSS on new device)
 	PubkeyAckMessage              = MessageType{MsgType: "pubkey-ack", MsgStage: 30}   // new device to server (=> start TSS msg management on server registerHandler)
@@ -84,12 +85,16 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	startTss := make(chan struct{}) // used to avoid polling for next messages until the tss process starts
 	errs := make(chan error, 2)
 
+	newClientPeerIdCh := make(chan string, 1)
+	existingClientPeerIdCh := make(chan string, 1)
 	metadataCh := make(chan string, 1)
 	adderCh := make(chan *tss.ServerAdd, 1)
 	existingDeviceTssDoneCh := make(chan struct{}, 1)
 	newDeviceDoneCh := make(chan struct{}, 1)
 	existingDeviceDoneCh := make(chan struct{}, 1)
 
+	server._cache.Set(userId+"-newclientpeeridch", newClientPeerIdCh, 10*time.Minute)
+	server._cache.Set(userId+"-existingclientpeeridch", existingClientPeerIdCh, 10*time.Minute)
 	server._cache.Set(userId+"-metadatach", metadataCh, 10*time.Minute)
 	server._cache.Set(userId+"-adderch", adderCh, 10*time.Minute)
 	server._cache.Set(userId+"-existingdevicetssdonech", existingDeviceTssDoneCh, 10*time.Minute)
@@ -97,6 +102,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	server._cache.Set(userId+"-existingdevicedonech", existingDeviceDoneCh, 10*time.Minute)
 
 	var metadata string
+	var newClientPeerID string
+	var existingClientPeerID string
 
 	var adder *tss.ServerAdd
 
@@ -130,6 +137,29 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 			// log.Println("received message in RegisterDeviceHandler:", msg)
 
 			switch msg.Type {
+			case PeerIdBroadcastMessage:
+				if stage > msg.Type.MsgStage {
+					// discard
+					log.Println("Device message but we're at later stage; stage:", stage)
+					continue
+				}
+
+				newClientPeerID = string(msg.Msg)
+
+				newClientPeerIdCh <- newClientPeerID
+				existingClientPeerID = <-existingClientPeerIdCh
+
+				PeerIdBroadcastMsg := Message{
+					Type: PeerIdBroadcastMessage,
+					Msg:  existingClientPeerID,
+				}
+				err = wsjson.Write(ctx, c, PeerIdBroadcastMsg)
+				if err != nil {
+					log.Println("RegisterDevice - deviceMsg - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+
 			case DeviceMessage:
 				// verify stage : if device message but we're at tss stage or further, discard
 				if stage > msg.Type.MsgStage {
@@ -166,7 +196,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 				log.Println("RegisterDeviceHandler - wallet retrieved share:", dkgResult.Share)
 
 				// Prepare Adding process
-				adder, err = tss.NewServerAdd(dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
+				adder, err = tss.NewServerAdd(newClientPeerID, existingClientPeerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
 				if err != nil {
 					log.Println("Error when creating new server Add:", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -190,7 +220,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 				walletJSON, err := json.Marshal(wallet)
 				if err != nil {
 					log.Println("RegisterDeviceHandler - Error marshaling wallet:", err)
-					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					errs <- err
 					return
 				}
 				payload := hex.EncodeToString(walletJSON)
@@ -277,7 +307,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 			case <-serverDone: // for the server, don't stop communcation straight when TSS is done (communication can still happen between clients)
 				return
 			default:
-				tssMsg, err := adder.GetNextMessageToSend(tss.AddNewClientID)
+				tssMsg, err := adder.GetNextMessageToSend(newClientPeerID)
 				if err != nil {
 					if strings.Contains(err.Error(), "no message to be sent") {
 						continue
@@ -291,7 +321,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 					continue
 				}
 
-				log.Println("RegisterDeviceHandler - got next message to send to", tss.AddNewClientID, ":", tssMsg)
+				log.Println("RegisterDeviceHandler - got next message to send to", newClientPeerID, ":", tssMsg)
 
 				// format message for communication
 				jsonEncodedMsg, err := json.Marshal(tssMsg)
@@ -415,7 +445,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get inter-handlers channels
-	metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, err := server.GetInterHandlersChannels(userId)
+	newClientPeerIdCh, existingClientPeerIdCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, err := server.GetInterHandlersChannels(userId)
 	if err != nil {
 		http.Error(w, "Channel not found", http.StatusUnauthorized)
 		return
@@ -445,6 +475,9 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	serverDone := make(chan struct{})
 	startTss := make(chan struct{}) // used to avoid polling for next messages until the tss process starts
 	errs := make(chan error, 2)
+
+	var newClientPeerID string
+	var existingClientPeerID string
 
 	var adder *tss.ServerAdd
 
@@ -478,6 +511,29 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 			// log.Println("received message in AcceptDeviceHandler:", msg)
 
 			switch msg.Type {
+			case PeerIdBroadcastMessage:
+				if stage > msg.Type.MsgStage {
+					// discard
+					log.Println("Device message but we're at later stage; stage:", stage)
+					continue
+				}
+
+				existingClientPeerID = string(msg.Msg)
+
+				existingClientPeerIdCh <- existingClientPeerID
+				newClientPeerID = <-newClientPeerIdCh
+
+				PeerIdBroadcastMsg := Message{
+					Type: PeerIdBroadcastMessage,
+					Msg:  newClientPeerID,
+				}
+				err = wsjson.Write(ctx, c, PeerIdBroadcastMsg)
+				if err != nil {
+					log.Println("RegisterDevice - deviceMsg - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+
 			case MetadataMessage:
 				// verify stage : if device message but we're at tss stage or further, discard
 				if stage > msg.Type.MsgStage {
@@ -601,7 +657,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 			case <-serverDone: // for the server, don't stop communcation straight when TSS is done (communication can still happen between clients)
 				return
 			default:
-				tssMsg, err := adder.GetNextMessageToSend(tss.AddExistingClientID)
+				tssMsg, err := adder.GetNextMessageToSend(existingClientPeerID)
 				if err != nil {
 					if strings.Contains(err.Error(), "no message to be sent") {
 						continue
@@ -615,7 +671,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 					continue
 				}
 
-				log.Println("AcceptDeviceHandler - got next message to send to", tss.AddExistingClientID, ":", tssMsg)
+				log.Println("AcceptDeviceHandler - got next message to send to", existingClientPeerID, ":", tssMsg)
 
 				// format message for communication
 				jsonEncodedMsg, err := json.Marshal(tssMsg)
@@ -719,72 +775,98 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 }
 
 // Returns channels : metadata, adder, new device done, existing device done
-func (server *Server) GetInterHandlersChannels(userId string) (chan string, chan *tss.ServerAdd, chan struct{}, chan struct{}, chan struct{}, error) {
+func (server *Server) GetInterHandlersChannels(userId string) (chan string, chan string, chan string, chan *tss.ServerAdd, chan struct{}, chan struct{}, chan struct{}, error) {
+
+	// NewClientPeerID
+	newClientPeerIdChInterface, ok := server._cache.Get(userId + "-newclientpeeridch")
+	if !ok {
+		log.Println("could not find newClientPeerIdCh in cache")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+	}
+
+	newClientPeerIdCh, ok := newClientPeerIdChInterface.(chan string)
+	if !ok {
+		log.Println("could not assert newClientPeerIdCh")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+	}
+
+	// ExistingClientPeerID
+	existingClientPeerIdChInterface, ok := server._cache.Get(userId + "-existingclientpeeridch")
+	if !ok {
+		log.Println("could not find existingClientPeerIdCh in cache")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+	}
+
+	existingClientPeerIdCh, ok := existingClientPeerIdChInterface.(chan string)
+	if !ok {
+		log.Println("could not assert existingClientPeerIdCh")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+	}
 
 	// Metadata
 	metadataChInterface, ok := server._cache.Get(userId + "-metadatach")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	metadataCh, ok := metadataChInterface.(chan string)
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Adder
 	adderChInterface, ok := server._cache.Get(userId + "-adderch")
 	if !ok {
 		log.Println("could not find adderReady in cache")
-		return nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	adderCh, ok := adderChInterface.(chan *tss.ServerAdd)
 	if !ok {
 		log.Println("could not assert adderReady")
-		return nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Existing Device TSS Done
 	existingDeviceTssDoneChInterface, ok := server._cache.Get(userId + "-existingdevicetssdonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	existingDeviceTssDoneCh, ok := existingDeviceTssDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// New Device Done
 	newDeivceDoneChInterface, ok := server._cache.Get(userId + "-newdevicedonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	newDeviceDoneCh, ok := newDeivceDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Existing Device Done
 	existingDeviceDoneChInterface, ok := server._cache.Get(userId + "-existingdevicedonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	existingDeviceDoneCh, ok := existingDeviceDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
-	return metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, nil
+	return newClientPeerIdCh, existingClientPeerIdCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, nil
 }

@@ -210,7 +210,7 @@ type ServerAdd struct {
 	service *serviceAddExisting
 }
 
-func NewServerAdd(pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*ServerAdd, error) {
+func NewServerAdd(newClientPeerID string, existingClientPeerID string, pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*ServerAdd, error) {
 	// will probably need a wrapper with JSON input
 
 	pubkey, err := NewPubkey(pubkeyStr)
@@ -218,10 +218,10 @@ func NewServerAdd(pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*Server
 		return nil, err
 	}
 
-	service := NewServiceAddExisting(pubkey, share, _threshold, AddNewClientID, BKs)
+	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, BKs)
 
 	pm := NewPeerManager(_serverID)
-	pm.AddPeer(AddExistingClientID)
+	pm.AddPeer(existingClientPeerID)
 	// pm.AddPeer(AddNewClientID)
 
 	err = service.Init(pm)
@@ -293,9 +293,10 @@ func (p *ServerAdd) HandleMessage(msg *Message) error {
 // Existing client
 type ExistingClientAdd struct {
 	service *serviceAddExisting
+	peerID  string
 }
 
-func NewExistingClientAdd(pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*ExistingClientAdd, error) {
+func NewExistingClientAdd(newClientPeerID string, peerID string, pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*ExistingClientAdd, error) {
 	// will probably need a wrapper with JSON input
 
 	pubkey, err := NewPubkey(pubkeyStr)
@@ -303,9 +304,9 @@ func NewExistingClientAdd(pubkeyStr PubkeyStr, share string, BKs map[string]BK) 
 		return nil, err
 	}
 
-	service := NewServiceAddExisting(pubkey, share, _threshold, AddNewClientID, BKs)
+	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, BKs)
 
-	pm := NewPeerManager(AddExistingClientID)
+	pm := NewPeerManager(peerID)
 	pm.AddPeer(_serverID)
 	// pm.AddPeer(AddNewClientID)
 
@@ -320,7 +321,7 @@ func NewExistingClientAdd(pubkeyStr PubkeyStr, share string, BKs map[string]BK) 
 		return service.Handle(msg)
 	})
 
-	return &ExistingClientAdd{service: service}, nil
+	return &ExistingClientAdd{service: service, peerID: peerID}, nil
 }
 
 func (p *ExistingClientAdd) GetDoneChan() chan struct{} {
@@ -357,6 +358,7 @@ func (p *ExistingClientAdd) Process() (*DkgResult, error) {
 		BKs:     BKs,
 		Share:   share,
 		Address: addr,
+		PeerID:  p.peerID,
 	}
 
 	return &dkgResult, nil
@@ -391,7 +393,7 @@ func (p *ExistingClientAdd) HandleMessage(msg *Message) error {
 		return err
 	}
 
-	if msg.PeerID == AddExistingClientID { // existing client is the target peer
+	if msg.PeerID == p.peerID { // existing client is the target peer
 		return p.service.pm.HandleMessage(addMsg)
 	} else {
 		p.service.pm.MustSend(msg.PeerID, addMsg)
@@ -403,9 +405,10 @@ func (p *ExistingClientAdd) HandleMessage(msg *Message) error {
 // New Client
 type ClientAdd struct {
 	service *serviceAddNew
+	peerID  string
 }
 
-func NewClientAdd(pubkeyStr PubkeyStr, BKs map[string]BK) (*ClientAdd, error) {
+func NewClientAdd(peerID string, acceptingDevicePeerID string, pubkeyStr PubkeyStr, BKs map[string]BK) (*ClientAdd, error) {
 	// will probably need a wrapper with JSON input
 
 	pubkey, err := NewPubkey(pubkeyStr)
@@ -415,9 +418,9 @@ func NewClientAdd(pubkeyStr PubkeyStr, BKs map[string]BK) (*ClientAdd, error) {
 
 	service := NewServiceAddNew(pubkey, _threshold, _rank, BKs)
 
-	pm := NewPeerManager(AddNewClientID)
+	pm := NewPeerManager(peerID)
 	pm.AddPeer(_serverID)
-	pm.AddPeer(AddExistingClientID)
+	pm.AddPeer(acceptingDevicePeerID)
 
 	err = service.Init(pm)
 	if err != nil {
@@ -430,7 +433,7 @@ func NewClientAdd(pubkeyStr PubkeyStr, BKs map[string]BK) (*ClientAdd, error) {
 		return service.Handle(msg)
 	})
 
-	return &ClientAdd{service: service}, nil
+	return &ClientAdd{service: service, peerID: peerID}, nil
 }
 
 func (p *ClientAdd) GetDoneChan() chan struct{} {
@@ -467,6 +470,7 @@ func (p *ClientAdd) Process() (*DkgResult, error) {
 		BKs:     BKs,
 		Share:   share,
 		Address: addr,
+		PeerID:  p.peerID,
 	}
 
 	return &dkgResult, nil
@@ -501,7 +505,7 @@ func (p *ClientAdd) HandleMessage(msg *Message) error {
 		return err
 	}
 
-	if msg.PeerID == AddNewClientID { // new client is the target peer
+	if msg.PeerID == p.peerID { // new client is the target peer
 		return p.service.pm.HandleMessage(addMsg)
 	} else {
 		p.service.pm.MustSend(msg.PeerID, addMsg)

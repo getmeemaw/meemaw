@@ -10,11 +10,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
+	"github.com/google/uuid"
 	"nhooyr.io/websocket"
 
 	_ "golang.org/x/mobile/bind"
@@ -45,7 +47,13 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 		return nil, "", err
 	}
 
-	dkg, err := tss.NewClientDkg()
+	clientPeerID := uuid.New().String()
+	if strings.HasSuffix(os.Args[0], ".test") {
+		clientPeerID = "client"
+	}
+	clientPeerID = "client" // REMOVE - once dkg & sign processes are updated with proper message management (incl. exchange of peerID)
+
+	dkg, err := tss.NewClientDkg(clientPeerID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -164,6 +172,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	pubkeyStr := dkgResult.Pubkey
 	BKs := dkgResult.BKs
 	share := dkgResult.Share
+	clientPeerID := dkgResult.PeerID
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -190,7 +199,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
-	signer, err := tss.NewClientSigner(pubkeyStr, share, BKs, message)
+	signer, err := tss.NewClientSigner(clientPeerID, pubkeyStr, share, BKs, message)
 	if err != nil {
 		log.Println("error when getting new client signer:", err)
 		return nil, &types.ErrBadRequest{}
@@ -257,10 +266,12 @@ func Recover(host string, dkgResultStr string, metadata string, authData string)
 	}
 
 	share := dkgResult.Share
+	clientPeerID := dkgResult.PeerID
 
 	// Create the form data
 	formData := url.Values{
-		"share": {share},
+		"share":        {share},
+		"clientPeerID": {clientPeerID},
 	}
 
 	// Send POST request

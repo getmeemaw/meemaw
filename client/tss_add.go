@@ -11,6 +11,7 @@ import (
 	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
+	"github.com/google/uuid"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
@@ -63,14 +64,17 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	var metadata string
 
-	// send DeviceMessage (NOTE : Pour accept, send metadata)
-	deviceMsg := server.Message{
-		Type: server.DeviceMessage,
-		Msg:  device,
+	peerID := uuid.New().String()
+	var acceptingDevicePeerID string
+
+	// send peerID
+	peerIdMsg := server.Message{
+		Type: server.PeerIdBroadcastMessage,
+		Msg:  peerID,
 	}
-	err = wsjson.Write(ctx, c, deviceMsg)
+	err = wsjson.Write(ctx, c, peerIdMsg)
 	if err != nil {
-		log.Println("RegisterDevice - deviceMsg - error writing json through websocket:", err)
+		log.Println("RegisterDevice - peerIdMsg - error writing json through websocket:", err)
 		errs <- err
 		return nil, "", err
 	}
@@ -103,6 +107,27 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 			// log.Println("received message in RegisterDevice:", msg)
 
 			switch msg.Type {
+			case server.PeerIdBroadcastMessage:
+				if stage > msg.Type.MsgStage {
+					// discard
+					log.Println("Device message but we're at later stage; stage:", stage)
+					continue
+				}
+
+				acceptingDevicePeerID = string(msg.Msg)
+
+				// send DeviceMessage
+				deviceMsg := server.Message{
+					Type: server.DeviceMessage,
+					Msg:  device,
+				}
+				err = wsjson.Write(ctx, c, deviceMsg)
+				if err != nil {
+					log.Println("RegisterDevice - deviceMsg - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+
 			case server.PubkeyMessage:
 				// Recover pubkey & BKs from message
 
@@ -127,7 +152,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				log.Println("RegisterDevice - creating adder")
 
 				// Create adder
-				adder, err = tss.NewClientAdd(publicWallet.PublicKey, publicWallet.BKs)
+				adder, err = tss.NewClientAdd(peerID, acceptingDevicePeerID, publicWallet.PublicKey, publicWallet.BKs)
 				if err != nil {
 					log.Println("error creating newClientAdd():", err)
 					errs <- err
@@ -296,7 +321,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	}()
 
 	// Start adder
-	dkgResult, err := adder.Process() // UPDATE RETURN
+	dkgResult, err := adder.Process()
 	if err != nil {
 		log.Println("error processing adder:", err)
 		errs <- err
@@ -418,15 +443,17 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	log.Println("sending metadata from acceptDevice:", metadata)
 
-	// send metadata
-	metadataMsg := server.Message{
-		Type: server.MetadataMessage,
-		Msg:  metadata,
+	peerID := dkgResult.PeerID
+	var newClientPeerID string
+
+	// send peerID
+	peerIdMsg := server.Message{
+		Type: server.PeerIdBroadcastMessage,
+		Msg:  peerID,
 	}
-	err = wsjson.Write(ctx, c, metadataMsg)
+	err = wsjson.Write(ctx, c, peerIdMsg)
 	if err != nil {
-		log.Println("AcceptDevice - MetadataMessage - error writing json through websocket:", err)
-		errs <- err
+		log.Println("AcceptDevice - peerIdMsg - error writing json through websocket:", err)
 		return err
 	}
 
@@ -460,12 +487,33 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 			// log.Println("received message in AcceptDevice:", msg)
 
 			switch msg.Type {
+			case server.PeerIdBroadcastMessage:
+				if stage > msg.Type.MsgStage {
+					// discard
+					log.Println("Device message but we're at later stage; stage:", stage)
+					continue
+				}
+
+				newClientPeerID = string(msg.Msg)
+
+				// send metadata
+				metadataMsg := server.Message{
+					Type: server.MetadataMessage,
+					Msg:  metadata,
+				}
+				err = wsjson.Write(ctx, c, metadataMsg)
+				if err != nil {
+					log.Println("AcceptDevice - MetadataMessage - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+
 			case server.MetadataAckMessage:
 				// Create adder
 
 				log.Println("AcceptDevice - creating adder")
 
-				adder, err = tss.NewExistingClientAdd(dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
+				adder, err = tss.NewExistingClientAdd(newClientPeerID, peerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
 				if err != nil {
 					log.Println("error creating newClientAdd():", err)
 					errs <- err

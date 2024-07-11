@@ -37,16 +37,17 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get client share from POST parameters
+	// Get client share and clientPeerID from POST parameters
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to parse form", http.StatusBadRequest)
 		return
 	}
 	clientShareStr := r.FormValue("share")
+	clientPeerID := r.FormValue("clientPeerID")
 
-	if len(clientShareStr) == 0 {
-		log.Println("No client share provided")
-		http.Error(w, "No client share", http.StatusBadRequest)
+	if len(clientShareStr) == 0 || len(clientPeerID) == 0 {
+		log.Println("Missing information")
+		http.Error(w, "Missing information", http.StatusBadRequest)
 		return
 	}
 
@@ -65,7 +66,7 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recover private key
-	privateKey, err := tss.RecoverPrivateKeyWrapper(dkgResult.Pubkey, dkgResult.Share, clientShareStr, dkgResult.BKs)
+	privateKey, err := tss.RecoverPrivateKeyWrapper(clientPeerID, dkgResult.Pubkey, dkgResult.Share, clientShareStr, dkgResult.BKs)
 	if err != nil {
 		log.Println("Error recovering private key:", err)
 		if strings.Contains(err.Error(), "invalid point") {
