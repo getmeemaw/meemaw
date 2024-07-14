@@ -181,12 +181,36 @@ func (p *ServerDkg) Process() (*DkgResult, error) {
 	return &dkgResult, nil
 }
 
-func (p *ServerDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend(p.clientPeerID)
+func (p *ServerDkg) GetNextMessageToSend() (Message, error) {
+	return p.service.pm.GetNextMessageToSendPeer(p.clientPeerID)
 }
 
-func (p *ServerDkg) HandleMessage(msg types.Message) error {
-	return p.service.pm.HandleMessage(msg)
+func (p *ServerDkg) HandleMessage(msg *Message) error {
+	// return p.service.pm.HandleMessage(msg)
+
+	// log.Println("HandleMessage server")
+
+	msgStr, ok := msg.Message.(string)
+	if !ok {
+		log.Println("msg was not a string")
+		return errors.New("msg was not a string")
+	}
+	byteString, err := hex.DecodeString(msgStr)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return err
+	}
+	dkgMsg := &dkg.Message{}
+	err = proto.Unmarshal(byteString, dkgMsg)
+	// err = json.Unmarshal(byteString, addMsg)
+	if err != nil {
+		log.Println("ClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
+		return err
+	}
+
+	return p.service.pm.HandleMessage(dkgMsg)
+
+	// return p.service.pm.HandleMessage(msg)
 }
 
 func (p *ServerDkg) DkgOrSign() int {
@@ -254,12 +278,34 @@ func (p *ClientDkg) Process() (*DkgResult, error) {
 	return &dkgResult, nil
 }
 
-func (p *ClientDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend(_serverID)
+func (p *ClientDkg) GetNextMessageToSend() (Message, error) {
+	return p.service.pm.GetNextMessageToSendPeer(_serverID)
 }
 
-func (p *ClientDkg) HandleMessage(msg types.Message) error {
-	return p.service.pm.HandleMessage(msg)
+func (p *ClientDkg) HandleMessage(msg *Message) error {
+	// return p.service.pm.HandleMessage(msg)
+
+	// log.Println("HandleMessage server")
+
+	msgStr, ok := msg.Message.(string)
+	if !ok {
+		log.Println("msg was not a string")
+		return errors.New("msg was not a string")
+	}
+	byteString, err := hex.DecodeString(msgStr)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return err
+	}
+	dkgMsg := &dkg.Message{}
+	err = proto.Unmarshal(byteString, dkgMsg)
+	// err = json.Unmarshal(byteString, addMsg)
+	if err != nil {
+		log.Println("ClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
+		return err
+	}
+
+	return p.service.pm.HandleMessage(dkgMsg)
 }
 
 func (p *ClientDkg) DkgOrSign() int {

@@ -79,7 +79,7 @@ func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Se
 
 	// dkg
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
-	r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
+	// r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
 
 	// sign
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
