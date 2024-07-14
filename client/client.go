@@ -426,15 +426,6 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 		return nil, &types.ErrUnauthorized{}
 	}
 
-	// Prepare signing process
-	path := "/sign?msg=" + hex.EncodeToString(message) + "&token=" + token
-
-	_host, err := urlToWs(host)
-	if err != nil {
-		log.Println("error getting ws host:", err)
-		return nil, &types.ErrBadRequest{}
-	}
-
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
@@ -442,10 +433,20 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 		return nil, &types.ErrBadRequest{}
 	}
 
+	// Prepare signing process
+
 	pubkeyStr := dkgResult.Pubkey
 	BKs := dkgResult.BKs
 	share := dkgResult.Share
 	clientPeerID := dkgResult.PeerID
+
+	path := "/sign?msg=" + hex.EncodeToString(message) + "&token=" + token + "&peer=" + clientPeerID
+
+	_host, err := urlToWs(host)
+	if err != nil {
+		log.Println("error getting ws host:", err)
+		return nil, &types.ErrBadRequest{}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

@@ -37,6 +37,8 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	// Get message to be signed from URL parameters
 	params := r.URL.Query()
 	msg := params.Get("msg")
+	clientPeerID := params.Get("peer")
+	// clientPeerID := "client"
 
 	if len(msg) == 0 {
 		http.Error(w, "No message to be signed", http.StatusBadRequest)
@@ -61,8 +63,6 @@ func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	clientPeerID := "client" // UPDATE : get it from client
 
 	// Prepare signing process
 	signer, err := tss.NewServerSigner(clientPeerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs, message)
