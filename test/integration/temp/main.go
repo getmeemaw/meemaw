@@ -13,32 +13,85 @@ func main() {
 	log.Println("test")
 
 	const host = "http://localhost:8421"
-	const authData = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImNEdE1CREFQNlphcm15QU8iLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzIwNzE2MjQ4LCJpYXQiOjE3MjA3MTI2NDgsImlzcyI6Imh0dHBzOi8vc2dkeHh3YWx0Y2RpbWl1aWtmbW4uc3VwYWJhc2UuY28vYXV0aC92MSIsInN1YiI6IjFkM2IzYjRmLWM0YzktNDVlNi1hZmU2LTQxZjcyZTZmZDcxYyIsImVtYWlsIjoibWFyY2VhdWxlY29tdGVAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3MTk5MzUyMzR9XSwic2Vzc2lvbl9pZCI6ImFiYmQ2NTAzLTg3ZmItNGI4OC04MDRhLTI2MjViMGU4OTk0YiIsImlzX2Fub255bW91cyI6ZmFsc2V9.5C-mvxtkt9H_NA8-mPdkI0zJj1okkAa8k1BK-lq1Zdc"
+	const authData = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImNEdE1CREFQNlphcm15QU8iLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NnZHh4d2FsdGNkaW1pdWlrZm1uLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIxZDNiM2I0Zi1jNGM5LTQ1ZTYtYWZlNi00MWY3MmU2ZmQ3MWMiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzIxMDU2NzYwLCJpYXQiOjE3MjEwNTMxNjAsImVtYWlsIjoibWFyY2VhdWxlY29tdGVAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3MTk5MzUyMzR9XSwic2Vzc2lvbl9pZCI6ImFiYmQ2NTAzLTg3ZmItNGI4OC04MDRhLTI2MjViMGU4OTk0YiIsImlzX2Fub255bW91cyI6ZmFsc2V9.-NKXkqJMvU-OivKmAYFOd63DUxn9Pu4q-oA317NmFdA"
 	const device = "my-super-new-device"
 
 	log.Println("Starting DKG")
 
-	// Generate wallet old client + server
-	dkgResultOldClient, metadataOldClient, err := client.Dkg(host, authData)
+	// Generate wallet first client + server
+	dkgResultFirstClient, metadataFirstClient, err := client.Dkg(host, authData)
 	if err != nil {
 		log.Println("Error client.Dkg:", err)
-		return
+		panic(err)
 	}
 
-	dkgResultOldClientBytes, err := json.Marshal(dkgResultOldClient)
+	dkgResultSecondClient, metadataSecondClient, err := AddDevice(host, authData, device, dkgResultFirstClient, metadataFirstClient)
 	if err != nil {
-		log.Println("Error marshaling dkgResult:", err)
-		return
+		log.Println("Error client.Dkg:", err)
+		panic(err)
 	}
 
+	dkgResultThirdClient, metadataThirdClient, err := AddDevice(host, authData, device, dkgResultSecondClient, metadataSecondClient)
+	if err != nil {
+		log.Println("Error client.Dkg:", err)
+		panic(err)
+	}
+
+	dkgResultFourthClient, metadataFourthClient, err := AddDevice(host, authData, device, dkgResultFirstClient, metadataFirstClient)
+	if err != nil {
+		log.Println("Error client.Dkg:", err)
+		panic(err)
+	}
+
+	log.Println("")
+
+	log.Printf("dkgResultFirstClient: %+v \n", dkgResultFirstClient)
+	log.Println("metadataFirstClient:", metadataFirstClient)
+
+	log.Println("")
+
+	log.Printf("dkgResultSecondClient: %+v \n", dkgResultSecondClient)
+	log.Println("metadataSecondClient:", metadataSecondClient)
+
+	log.Println("")
+
+	log.Printf("dkgResultThirdClient: %+v \n", dkgResultThirdClient)
+	log.Println("metadataThirdClient:", metadataThirdClient)
+
+	log.Println("")
+
+	log.Printf("dkgResultFourthClient: %+v \n", dkgResultFourthClient)
+	log.Println("metadataFourthClient:", metadataFourthClient)
+
+	log.Println("")
+
+	dkgResultBytes, err := json.Marshal(dkgResultThirdClient)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		panic(err)
+	}
+
+	dkgResultStr := string(dkgResultBytes)
+
+	signature, err := client.Sign(host, []byte("test"), dkgResultStr, metadataThirdClient, authData)
+	if err != nil {
+		log.Println("error while signing:", err)
+		panic(err)
+	}
+
+	log.Println("signature:", signature)
+}
+
+func AddDevice(host, authData, device string, dkgResultFirstClient *tss.DkgResult, metadataFirstClient string) (*tss.DkgResult, string, error) {
 	// Add new device
 	newClientDone := make(chan struct{})
 	var dkgResultNewClient *tss.DkgResult
 	var metadataNewClient string
 
-	go func() {
-		log.Println("Starting register device")
+	var err error
 
+	go func() {
+		log.Println("AddDevice - starting registerDevice")
 		dkgResultNewClient, metadataNewClient, err = client.RegisterDevice(host, authData, device)
 		if err != nil {
 			log.Println("Error registerDevice:", err)
@@ -50,31 +103,23 @@ func main() {
 
 	time.Sleep(200 * time.Millisecond)
 
-	log.Println("starting accepting device")
+	log.Println("AddDevice - starting acceptDevice")
 
-	err = client.AcceptDevice(host, string(dkgResultOldClientBytes), metadataOldClient, authData)
+	dkgResultFirstClientBytes, err := json.Marshal(dkgResultFirstClient)
+	if err != nil {
+		log.Println("Error marshaling dkgResult:", err)
+		return nil, "", err
+	}
+
+	err = client.AcceptDevice(host, string(dkgResultFirstClientBytes), metadataFirstClient, authData)
 	if err != nil {
 		log.Println("Error acceptDevice:", err)
-		return
+		return nil, "", err
 	}
 
 	log.Println("client.AcceptDevice done")
 
 	<-newClientDone
 
-	log.Println("")
-
-	log.Printf("dkgResultOldClient: %+v \n", dkgResultOldClient)
-	log.Println("metadataOldClient:", metadataOldClient)
-
-	log.Println("")
-
-	// COMPARE
-	log.Printf("dkgResultNewClient: %+v \n", dkgResultNewClient)
-	log.Println("metadataNewClient:", metadataNewClient)
-
-	log.Println("")
-
-	log.Println("share old client:", dkgResultOldClient.Share)
-	log.Println("share new client:", dkgResultNewClient.Share)
+	return dkgResultNewClient, metadataNewClient, nil
 }

@@ -11,25 +11,79 @@ import (
 )
 
 const addDevice = `-- name: AddDevice :one
-INSERT INTO devices (user_id, wallet_id, user_agent)
-VALUES ($1, $2, $3)
+INSERT INTO devices (user_id, wallet_id, user_agent, peer_id)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
-RETURNING id, user_id, wallet_id, user_agent
+RETURNING id, user_id, wallet_id, peer_id, user_agent
 `
 
 type AddDeviceParams struct {
 	UserId    int64
 	WalletId  int64
 	UserAgent string
+	PeerId    string
 }
 
 func (q *Queries) AddDevice(ctx context.Context, arg AddDeviceParams) (Device, error) {
-	row := q.db.QueryRowContext(ctx, addDevice, arg.UserId, arg.WalletId, arg.UserAgent)
+	row := q.db.QueryRowContext(ctx, addDevice,
+		arg.UserId,
+		arg.WalletId,
+		arg.UserAgent,
+		arg.PeerId,
+	)
 	var i Device
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.WalletID,
+		&i.PeerID,
+		&i.UserAgent,
+	)
+	return i, err
+}
+
+const addPeer = `-- name: AddPeer :one
+WITH existing_user AS (
+    SELECT id AS user_id
+    FROM users
+    WHERE foreign_key = $3
+),
+updated_wallet AS (
+    UPDATE wallets
+    SET encrypted_dkg_results = $4,
+        nonce = $5
+    FROM existing_user
+    WHERE wallets.user_id = existing_user.user_id
+    RETURNING wallets.id AS wallet_id, wallets.user_id
+)
+INSERT INTO devices (user_id, wallet_id, user_agent, peer_id)
+SELECT user_id, wallet_id, $1, $2
+FROM updated_wallet
+RETURNING id, user_id, wallet_id, peer_id, user_agent
+`
+
+type AddPeerParams struct {
+	UserAgent           string
+	PeerId              string
+	ForeignKey          string
+	EncryptedDkgResults []byte
+	Nonce               []byte
+}
+
+func (q *Queries) AddPeer(ctx context.Context, arg AddPeerParams) (Device, error) {
+	row := q.db.QueryRowContext(ctx, addPeer,
+		arg.UserAgent,
+		arg.PeerId,
+		arg.ForeignKey,
+		arg.EncryptedDkgResults,
+		arg.Nonce,
+	)
+	var i Device
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.WalletID,
+		&i.PeerID,
 		&i.UserAgent,
 	)
 	return i, err
@@ -83,6 +137,56 @@ func (q *Queries) AddWallet(ctx context.Context, arg AddWalletParams) (Wallet, e
 	return i, err
 }
 
+const dkg = `-- name: Dkg :one
+WITH new_user AS (
+    INSERT INTO users (foreign_key)
+    VALUES ($3)
+    ON CONFLICT DO NOTHING
+    RETURNING id AS user_id
+),
+new_wallet AS (
+    INSERT INTO wallets (user_id, public_address, encrypted_dkg_results, nonce)
+    SELECT user_id, $4, $5, $6
+    FROM new_user
+    ON CONFLICT DO NOTHING
+    RETURNING id AS wallet_id, user_id
+)
+INSERT INTO devices (user_id, wallet_id, user_agent, peer_id)
+SELECT user_id, wallet_id, $1, $2
+FROM new_wallet
+ON CONFLICT DO NOTHING
+RETURNING id, user_id, wallet_id, peer_id, user_agent
+`
+
+type DkgParams struct {
+	UserAgent           string
+	PeerId              string
+	ForeignKey          string
+	PublicAddress       string
+	EncryptedDkgResults []byte
+	Nonce               []byte
+}
+
+func (q *Queries) Dkg(ctx context.Context, arg DkgParams) (Device, error) {
+	row := q.db.QueryRowContext(ctx, dkg,
+		arg.UserAgent,
+		arg.PeerId,
+		arg.ForeignKey,
+		arg.PublicAddress,
+		arg.EncryptedDkgResults,
+		arg.Nonce,
+	)
+	var i Device
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.WalletID,
+		&i.PeerID,
+		&i.UserAgent,
+	)
+	return i, err
+}
+
 const getFirstUser = `-- name: GetFirstUser :one
 
 SELECT id, foreign_key FROM users
@@ -125,7 +229,7 @@ func (q *Queries) GetUserByForeignKey(ctx context.Context, foreignkey string) (U
 }
 
 const getUserDevices = `-- name: GetUserDevices :many
-SELECT id, user_id, wallet_id, user_agent FROM devices
+SELECT id, user_id, wallet_id, peer_id, user_agent FROM devices
 WHERE user_id = $1
 `
 
@@ -142,6 +246,7 @@ func (q *Queries) GetUserDevices(ctx context.Context, userid int64) ([]Device, e
 			&i.ID,
 			&i.UserID,
 			&i.WalletID,
+			&i.PeerID,
 			&i.UserAgent,
 		); err != nil {
 			return nil, err

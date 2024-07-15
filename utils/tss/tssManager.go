@@ -119,6 +119,32 @@ type DkgResult struct {
 	PeerID  string
 }
 
+func MergeDkgResults(first, second *DkgResult) (*DkgResult, bool) {
+	if first.Address != second.Address || first.PeerID != second.PeerID || first.Share != second.Share || first.Pubkey.X != second.Pubkey.X || first.Pubkey.Y != second.Pubkey.Y {
+		return nil, false
+	}
+
+	mergedBKs := make(map[string]BK)
+
+	for key, value := range first.BKs {
+		mergedBKs[key] = value
+	}
+
+	for key, value := range second.BKs {
+		mergedBKs[key] = value
+	}
+
+	ret := &DkgResult{
+		Pubkey:  first.Pubkey,
+		Share:   first.Share,
+		Address: first.Address,
+		PeerID:  first.PeerID,
+		BKs:     mergedBKs,
+	}
+
+	return ret, true
+}
+
 // Server
 
 type ServerDkg struct {
@@ -342,7 +368,14 @@ func NewServerSigner(clientPeerID string, pubkeyStr PubkeyStr, share string, BKs
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == clientPeerID {
+			newBKs[key] = value
+		}
+	}
+
+	service := NewServiceSigner(pubkey, share, newBKs, message)
 
 	pm := NewPeerManager(_serverID)
 	pm.AddPeer(clientPeerID)
@@ -417,7 +450,14 @@ func NewClientSigner(clientPeerID string, pubkeyStr PubkeyStr, share string, BKs
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == clientPeerID {
+			newBKs[key] = value
+		}
+	}
+
+	service := NewServiceSigner(pubkey, share, newBKs, message)
 
 	pm := NewPeerManager(clientPeerID)
 	pm.AddPeer(_serverID)

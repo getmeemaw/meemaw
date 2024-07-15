@@ -154,7 +154,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				// Create adder
 				adder, err = tss.NewClientAdd(peerID, acceptingDevicePeerID, publicWallet.PublicKey, publicWallet.BKs)
 				if err != nil {
-					log.Println("error creating newClientAdd():", err)
+					log.Println("RegisterDevice - error creating newClientAdd():", err)
 					errs <- err
 					return
 				}
@@ -515,7 +515,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 				adder, err = tss.NewExistingClientAdd(newClientPeerID, peerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
 				if err != nil {
-					log.Println("error creating newClientAdd():", err)
+					log.Println("AcceptDevice - error creating newClientAdd():", err)
 					errs <- err
 					return
 				}

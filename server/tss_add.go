@@ -478,6 +478,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 	var newClientPeerID string
 	var existingClientPeerID string
+	var metadata string
 
 	var adder *tss.ServerAdd
 
@@ -542,8 +543,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 					continue
 				}
 
-				// READ METADATA FROM MESSAGE
-				metadata := msg.Msg // verify if sufficient
+				metadata = msg.Msg
 
 				log.Println("AcceptDeviceHandler - metadata from message:", metadata)
 
@@ -705,18 +705,42 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
+	originalDkgResult := adder.GetOriginalWallet()
+
+	log.Println("AcceptDeviceHandler - originalDkgResult before process:", originalDkgResult)
+
 	// Start Adder process.
-	err = adder.Process()
+	updatedDkgResult, err := adder.Process()
 	if err != nil {
-		log.Println("Error while adder process:", err)
+		log.Println("AcceptDeviceHandler - Error while adder process:", err)
 		c.Close(websocket.StatusInternalError, "adder process failed")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Println("AcceptDeviceHandler - process done")
+	log.Println("AcceptDeviceHandler - originalDkgResult after process:", originalDkgResult)
 
-	// UPDATE WALLET IN DB : update BKs (to include new client)
+	log.Println("AcceptDeviceHandler - process done, updatedDkgResult:", updatedDkgResult)
+
+	mergedDkgResult, ok := tss.MergeDkgResults(originalDkgResult, updatedDkgResult)
+	if !ok {
+		log.Println("AcceptDeviceHandler - Error while merging dkg results:", err)
+		c.Close(websocket.StatusInternalError, "adder process failed")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Update wallet in DB
+	// note : verify that everything same except for BKs ??
+	userAgent := r.UserAgent()
+	err = server._vault.AddPeer(context.WithValue(r.Context(), types.ContextKey("metadata"), metadata), userId, newClientPeerID, userAgent, mergedDkgResult) // add metadata to context
+	if err != nil {
+		log.Println("Error while storing adding peer in DB:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("AcceptDeviceHandler - mergedDkgResult:", mergedDkgResult)
 
 	// start finishing steps after tss process => sending metadata
 	<-tssDone // kind of a duplicate from Process() in terms of timing?

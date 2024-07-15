@@ -58,6 +58,7 @@ func (p *serviceAddExisting) Init(pm *PeerManager) error {
 	}
 
 	log.Println("serviceAddExisting.init - dkgResult:", dkgResult)
+	log.Println("serviceAddExisting.init - pm:", pm)
 
 	oldPeerAddShare, err := oldpeer.NewAddShare(pm, dkgResult.PublicKey, p.threshold, dkgResult.Share, dkgResult.Bks, p.newClientID, p)
 	if err != nil {
@@ -207,7 +208,29 @@ func (p *serviceAddNew) OnStateChanged(oldState types.MainState, newState types.
 // ///////
 // Server
 type ServerAdd struct {
-	service *serviceAddExisting
+	service     *serviceAddExisting
+	originalBKs map[string]BK
+}
+
+func (p *ServerAdd) GetOriginalWallet() *DkgResult {
+	pubkey := Pubkey{
+		X: p.service.pubkey.X,
+		Y: p.service.pubkey.Y,
+	}
+	share := p.service.share
+
+	addr := pubkey.GetAddress().Hex()
+	pubkeyStr := pubkey.GetStr()
+
+	dkgResult := DkgResult{
+		Pubkey:  pubkeyStr,
+		BKs:     p.originalBKs,
+		Share:   share,
+		Address: addr,
+		PeerID:  _serverID,
+	}
+
+	return &dkgResult
 }
 
 func NewServerAdd(newClientPeerID string, existingClientPeerID string, pubkeyStr PubkeyStr, share string, BKs map[string]BK) (*ServerAdd, error) {
@@ -218,7 +241,14 @@ func NewServerAdd(newClientPeerID string, existingClientPeerID string, pubkeyStr
 		return nil, err
 	}
 
-	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, BKs)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == existingClientPeerID {
+			newBKs[key] = value
+		}
+	}
+
+	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, newBKs)
 
 	pm := NewPeerManager(_serverID)
 	pm.AddPeer(existingClientPeerID)
@@ -235,24 +265,47 @@ func NewServerAdd(newClientPeerID string, existingClientPeerID string, pubkeyStr
 		return service.Handle(msg)
 	})
 
-	return &ServerAdd{service: service}, nil
+	return &ServerAdd{service: service, originalBKs: BKs}, nil
 }
 
 func (p *ServerAdd) GetDoneChan() chan struct{} {
 	return p.service.GetDoneChan()
 }
 
-func (p *ServerAdd) Process() error { // Update to have result that makes sense
+func (p *ServerAdd) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return fmt.Errorf("could not get server signer results")
+		return nil, errors.New("could not get serverAdd results")
 	}
 
-	log.Println("ServerAdd result:", p.service.result)
-	log.Println("ServerAdd result share:", p.service.result.Share)
+	pubkey := Pubkey{
+		X: p.service.result.PublicKey.GetX(),
+		Y: p.service.result.PublicKey.GetY(),
+	}
+	share := p.service.result.Share.String()
+	BKs := make(map[string]BK)
 
-	return nil
+	addr := pubkey.GetAddress().Hex()
+	pubkeyStr := pubkey.GetStr()
+
+	// Build bks.
+	for peerID, bk := range p.service.result.Bks {
+		BKs[peerID] = BK{
+			X:    bk.GetX().String(),
+			Rank: bk.GetRank(),
+		}
+	}
+
+	dkgResult := DkgResult{
+		Pubkey:  pubkeyStr,
+		BKs:     BKs,
+		Share:   share,
+		Address: addr,
+		PeerID:  _serverID,
+	}
+
+	return &dkgResult, nil
 }
 
 func (p *ServerAdd) GetNextMessageToSend(peerID string) (Message, error) {
@@ -304,7 +357,14 @@ func NewExistingClientAdd(newClientPeerID string, peerID string, pubkeyStr Pubke
 		return nil, err
 	}
 
-	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, BKs)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == peerID {
+			newBKs[key] = value
+		}
+	}
+
+	service := NewServiceAddExisting(pubkey, share, _threshold, newClientPeerID, newBKs)
 
 	pm := NewPeerManager(peerID)
 	pm.AddPeer(_serverID)

@@ -27,9 +27,10 @@ type Server struct {
 }
 
 type Vault interface {
-	WalletExists(context.Context, string) error
-	StoreWallet(context.Context, string, string, *tss.DkgResult) (string, error)
-	RetrieveWallet(context.Context, string) (*tss.DkgResult, error)
+	WalletExists(ctx context.Context, foreignKey string) error
+	StoreWallet(ctx context.Context, foreignKey string, peerID string, userAgent string, dkgResult *tss.DkgResult) (string, error)
+	RetrieveWallet(ctx context.Context, foreignKey string) (*tss.DkgResult, error)
+	AddPeer(ctx context.Context, foreignKey string, peerID string, userAgent string, updatedDkgResult *tss.DkgResult) error
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests

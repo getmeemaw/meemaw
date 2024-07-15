@@ -430,7 +430,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Store dkgResult
 	userAgent := r.UserAgent()
-	metadata, err := server._vault.StoreWallet(r.Context(), userAgent, userId, dkgResult) // use context from request
+	metadata, err := server._vault.StoreWallet(r.Context(), userId, clientPeerID, userAgent, dkgResult) // use context from request
 	if err != nil {
 		log.Println("Error while storing dkg result:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
