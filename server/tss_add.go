@@ -348,6 +348,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 						errs <- err
 						return
 					}
+
+					log.Println("RegisterDeviceHandler - sent TssMsg message:", msg)
 				}
 
 				time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready
@@ -698,6 +700,8 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 						errs <- err
 						return
 					}
+
+					log.Println("AcceptDeviceHandler - sent TssMsg message:", msg)
 				}
 
 				time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready

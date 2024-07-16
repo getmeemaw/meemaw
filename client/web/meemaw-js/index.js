@@ -68,6 +68,16 @@ export class Wallet {
 
         return "0x"+privateKey;
     }
+
+    // AcceptDevice runs the TSS process of adding another device
+    async AcceptDevice() {
+        try {
+            await window.AcceptDevice(this.host, this.dkgResult, this.metadata, this.authData);
+        } catch (error) {
+            console.log("error while accepting device:", error)
+            throw error;
+        }
+    }
 }
 
 export default class Meemaw {
@@ -92,7 +102,7 @@ export default class Meemaw {
     }
 
     // GetWallet returns the wallet if it exists or creates a new one
-    async GetWallet(authData) {
+    async GetWallet(authData, callbackRegisterStarted, callbackRegisterDone) {
         if (!authData) {
             throw new Error('authData is empty');
         }
@@ -106,31 +116,64 @@ export default class Meemaw {
             throw error;
         }
 
-        const dkgResult = window.localStorage.getItem(localStorageKeys.dkgResult+"-"+userId);
-        const address = window.localStorage.getItem(localStorageKeys.address+"-"+userId);
-        const metadata = window.localStorage.getItem(localStorageKeys.metadata+"-"+userId);
+        const storedDkgResult = window.localStorage.getItem(localStorageKeys.dkgResult+"-"+userId);
+        const storedAddress = window.localStorage.getItem(localStorageKeys.address+"-"+userId);
+        const storedMetadata = window.localStorage.getItem(localStorageKeys.metadata+"-"+userId);
 
         // If it does, return the wallet
-        if (dkgResult !== null && address !== null) {
+        if (storedDkgResult !== null && storedAddress !== null) {
             console.log("Loading existing wallet")
-            return new Wallet(this.host, dkgResult, metadata, address, authData);
+            return new Wallet(this.host, storedDkgResult, storedMetadata, storedAddress, authData);
         }
 
-        // Else, DKG
+        // Try DKG
         try {
+            console.log("trying DKG")
             const resp = await window.Dkg(this.host, authData);
+            console.log("got DKG resp:", resp)
             const parsedResp = JSON.parse(resp);
+            const newDkgResult = JSON.stringify(parsedResp.dkgResult);
 
-            const metadata = parsedResp.metadata;
-            const parsedDkgResult = parsedResp.dkgResult;
+            this.storeDkgResults(userId, newDkgResult, parsedResp.dkgResult.Address, parsedResp.metadata);
+            return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
+        } catch (err) {
+            console.log("Error while DKG:", err)
+            if (err instanceof Error) {    
+                // Check for specific error messages or properties
+                if (err.message === "conflict") {
+                    console.log("Wallet already exists on server side. Registering device.");
+                } else {
+                    console.log("error while dkg:", err.message);
+                    throw err;
+                }
+            } else {
+                console.error("Got error while DKG. Unknown error type:", err);
+                throw err;
+            }
+        }
 
-            const newDkgResult = JSON.stringify(parsedDkgResult);
-            const addr = parsedDkgResult.Address;
+        // If conflict error (= wallet already exists on server side), try RegisterDevice
+        try{
+            if (typeof callbackRegisterStarted === 'function') {
+                callbackRegisterStarted(deviceCode);
+            } else {
+                console.warn('register device started, but no callback function provided')
+            }
 
-            this.storeDkgResults(userId, newDkgResult, addr, metadata);
-            return new Wallet(this.host, newDkgResult, metadata, addr, authData);
-        } catch (error) {
-            console.log("error while dkg:", error)
+            const resp = await window.RegisterDevice(this.host, authData);
+            const parsedResp = JSON.parse(resp);
+            const newDkgResult = JSON.stringify(parsedResp.dkgResult);
+            this.storeDkgResults(userId, newDkgResult, parsedResp.dkgResult.Address, parsedResp.metadata);
+
+            if (typeof callbackRegisterDone === 'function') {
+                callbackRegisterDone(deviceCode);
+            } else {
+                console.warn('register device is done, but no callback function provided')
+            }
+
+            return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
+        } catch(error) {
+            console.log("error while registering device:", error)
             throw error;
         }
     }

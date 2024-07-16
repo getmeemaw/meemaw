@@ -238,6 +238,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		for {
+			log.Println("DkgHandler - wsjson.Read")
 			var msg Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
@@ -255,13 +256,13 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Handle other errors
-				log.Println("RegisterDeviceHandler - error reading message from websocket:", err)
+				log.Println("DkgHandler - error reading message from websocket:", err)
 				log.Println("websocket.CloseStatus(err):", closeStatus)
 				errs <- err
 				return
 			}
 
-			// log.Println("received message in RegisterDeviceHandler:", msg)
+			// log.Println("received message in DkgHandler:", msg)
 
 			switch msg.Type {
 			case PeerIdBroadcastMessage:
@@ -272,6 +273,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				clientPeerID = string(msg.Msg)
+
+				log.Println("DkgHandler - received PeerIdBroadcastMessage:", clientPeerID)
 
 				// Prepare DKG process
 				dkg, err = tss.NewServerDkg(clientPeerID)
@@ -292,6 +295,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 					log.Println("TSS message but we're at later stage; stage:", stage)
 					continue
 				}
+
+				log.Println("DkgHandler - received TssMessage:", msg)
 
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
@@ -428,6 +433,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 
 	stage = 40 // only move to next stage after tss process is done
 
+	log.Println("DkgHandler - storing wallet")
+
 	// Store dkgResult
 	userAgent := r.UserAgent()
 	metadata, err := server._vault.StoreWallet(r.Context(), userId, clientPeerID, userAgent, dkgResult) // use context from request
@@ -436,6 +443,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	log.Println("DkgHandler - sending metadata")
 
 	// Send metadata to client
 	ack := Message{
@@ -449,9 +458,13 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Println("DkgHandler - metadata sent")
+
 	// Wait for the client to respond with MetadataAckMessage (note: timer so that we remove wallet from DB if never get ack ?)
 	<-serverDone
 	cancel()
+
+	log.Println("DkgHandler - serverDone, closing")
 
 	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
 

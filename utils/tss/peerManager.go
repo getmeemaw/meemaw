@@ -74,6 +74,9 @@ func (p *PeerManager) MustSend(peerID string, message interface{}) {
 
 // AddPeers adds peers to peer list.
 func (p *PeerManager) AddPeer(peerID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.peers[peerID] = true
 }
 
@@ -173,6 +176,9 @@ func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 }
 
 func (p *PeerManager) RegisterHandleMessage(handleFunc func(types.Message) error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.handleMessageFunction = handleFunc
 }
 

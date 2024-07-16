@@ -81,6 +81,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	go func() {
 		for {
+			log.Println("RegisterDevice - wsjson.Read")
 			var msg server.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
@@ -104,7 +105,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				return
 			}
 
-			// log.Println("received message in RegisterDevice:", msg)
+			log.Println("RegisterDevice - received message:", msg)
 
 			switch msg.Type {
 			case server.PeerIdBroadcastMessage:
@@ -266,15 +267,19 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	// TSS sending and listening for finish signal
 	go func() {
+		var counter int
+
 		for {
 			select {
 			case <-serverDone:
 				return
 			default:
+				log.Println("RegisterDevice - adder.GetNextMessageToSendAll()")
 				// Get next message to send (either server or other devices)
 				tssMsg, err := adder.GetNextMessageToSendAll()
 				if err != nil {
 					if strings.Contains(err.Error(), "no message to be sent") {
+						time.Sleep(10 * time.Millisecond)
 						continue
 					}
 					log.Println("error getting next message:", err)
@@ -283,6 +288,12 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				}
 
 				if len(tssMsg.PeerID) == 0 {
+					if counter > 100 {
+						log.Println("no more messages it seems like")
+						return
+					}
+					counter++
+					time.Sleep(10 * time.Millisecond)
 					continue
 				}
 
@@ -319,6 +330,8 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 			}
 		}
 	}()
+
+	log.Println("RegisterDevice - start process")
 
 	// Start adder
 	dkgResult, err := adder.Process()
@@ -461,6 +474,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	go func() {
 		for {
+			log.Println("AcceptDevice - wsjson.Read")
 			var msg server.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
@@ -484,7 +498,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				return
 			}
 
-			// log.Println("received message in AcceptDevice:", msg)
+			log.Println("AcceptDevice - received message:", msg)
 
 			switch msg.Type {
 			case server.PeerIdBroadcastMessage:
@@ -604,6 +618,8 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	// TSS sending and listening for finish signal
 	go func() {
+		var counter int
+
 		for {
 			select {
 			case <-serverDone:
@@ -613,6 +629,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				tssMsg, err := adder.GetNextMessageToSendAll()
 				if err != nil {
 					if strings.Contains(err.Error(), "no message to be sent") {
+						time.Sleep(10 * time.Millisecond)
 						continue
 					}
 					log.Println("error getting next message:", err)
@@ -621,6 +638,12 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				}
 
 				if len(tssMsg.PeerID) == 0 {
+					if counter > 100 {
+						log.Println("no more messages it seems like")
+						return
+					}
+					counter++
+					time.Sleep(10 * time.Millisecond)
 					continue
 				}
 
@@ -657,6 +680,8 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 			}
 		}
 	}()
+
+	log.Println("AcceptDevice - start process")
 
 	// Start adder
 	newDkgResult, err := adder.Process() // UPDATE RETURN

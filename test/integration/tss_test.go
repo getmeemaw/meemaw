@@ -67,8 +67,6 @@ func TestDkg(t *testing.T) {
 	///////////////////
 	/// TEST 2 : user already has a wallet on server
 
-	// NOTE : TO BE UPDATED WHEN IMPLEMENTING MULTI DEVICE : If new device, should be allowed
-
 	testCase = "test 2 (user already has a wallet on server)"
 
 	params = getStdParameters()
