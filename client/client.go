@@ -343,6 +343,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				tssMsg, err := dkg.GetNextMessageToSend()
 				if err != nil {
 					if strings.Contains(err.Error(), "no message to be sent") {
+						time.Sleep(10 * time.Millisecond)
 						continue
 					}
 					log.Println("error getting next message:", err)
