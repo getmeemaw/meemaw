@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -154,6 +155,31 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Prepare DKG process
 	path := "/dkg?token=" + token
 
+	// Check if wallet already exists
+	resp, err := http.Get(host + path)
+	if resp.StatusCode == 401 {
+		return nil, "", &types.ErrUnauthorized{}
+	} else if resp.StatusCode == 400 {
+		return nil, "", &types.ErrBadRequest{}
+	} else if resp.StatusCode == 404 {
+		return nil, "", &types.ErrNotFound{}
+	} else if resp.StatusCode == 409 {
+		log.Println("existing wallet")
+		return nil, "", &types.ErrConflict{}
+	} else if resp.StatusCode == 426 {
+		log.Println("no existing wallet")
+	} else {
+		log.Println("error dialing dkg (first call):", err)
+		return nil, "", errors.New("error dialing dkg (first call)")
+	}
+	if err != nil {
+		log.Println("error dialing dkg (first call):", err)
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	log.Println("lolilol")
+
 	_host, err := urlToWs(host)
 	if err != nil {
 		log.Println("error getting ws host:", err)
@@ -174,20 +200,10 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	c, resp, err := websocket.Dial(ctx, _host+path, nil)
+	c, _, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
-		if resp.StatusCode == 401 {
-			return nil, "", &types.ErrUnauthorized{}
-		} else if resp.StatusCode == 400 {
-			return nil, "", &types.ErrBadRequest{}
-		} else if resp.StatusCode == 404 {
-			return nil, "", &types.ErrNotFound{}
-		} else if resp.StatusCode == 409 {
-			return nil, "", &types.ErrConflict{}
-		} else {
-			log.Println("error dialing websocket:", err)
-			return nil, "", err
-		}
+		log.Println("error dialing websocket:", err)
+		return nil, "", err
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
@@ -212,6 +228,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	go func() {
 		for {
+			log.Println("Dkg - wsjson.Read")
 			var msg server.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
@@ -235,7 +252,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				return
 			}
 
-			// log.Println("received message in RegisterDevice:", msg)
+			log.Println("received message in Dkg:", msg)
 
 			switch msg.Type {
 			case server.TssMessage:
@@ -246,7 +263,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 					continue
 				}
 
-				log.Println("Dkg - received tss message")
+				log.Println("Dkg - received tss message:", msg)
 
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
@@ -273,6 +290,8 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 					errs <- err
 					return
 				}
+
+				log.Println("Dkg - tssMsg handled")
 
 			case server.MetadataMessage:
 				// note : have a timer somewhere, if after X seconds we don't have this message, then it means the process failed.
@@ -313,6 +332,8 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	// TSS sending and listening for finish signal
 	go func() {
+		var counter int
+
 		for {
 			select {
 			case <-serverDone:
@@ -330,6 +351,11 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				}
 
 				if len(tssMsg.PeerID) == 0 {
+					if counter > 100 {
+						log.Println("no more messages it seems like")
+						return
+					}
+					counter++
 					continue
 				}
 
@@ -353,13 +379,14 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				// log.Println("trying send, next encoded message to send:", encodedMsg)
 
 				if tssMsg.Message != nil {
-					// log.Println("trying to send message:", encodedMsg)
+					log.Println("Dkg - trying to send message:", tssMsg.Message)
 					err := wsjson.Write(ctx, c, msg)
 					if err != nil {
 						log.Println("RegisterDevice - tss message - error writing json through websocket:", err)
 						errs <- err
 						return
 					}
+					log.Println("Dkg - message sent")
 				}
 
 				time.Sleep(10 * time.Millisecond)
