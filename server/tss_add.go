@@ -62,6 +62,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 	newClientPeerIdCh := make(chan string, 1)
 	existingClientPeerIdCh := make(chan string, 1)
+	useragentCh := make(chan string, 1)
 	metadataCh := make(chan string, 1)
 	adderCh := make(chan *tss.ServerAdd, 1)
 	existingDeviceTssDoneCh := make(chan struct{}, 1)
@@ -70,6 +71,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 	server._cache.Set(userId+"-newclientpeeridch", newClientPeerIdCh, 10*time.Minute)
 	server._cache.Set(userId+"-existingclientpeeridch", existingClientPeerIdCh, 10*time.Minute)
+	server._cache.Set(userId+"-useragentch", useragentCh, 10*time.Minute)
 	server._cache.Set(userId+"-metadatach", metadataCh, 10*time.Minute)
 	server._cache.Set(userId+"-adderch", adderCh, 10*time.Minute)
 	server._cache.Set(userId+"-existingdevicetssdonech", existingDeviceTssDoneCh, 10*time.Minute)
@@ -123,6 +125,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 				newClientPeerIdCh <- newClientPeerID
 				existingClientPeerID = <-existingClientPeerIdCh
+
+				useragentCh <- r.UserAgent()
 
 				PeerIdBroadcastMsg := ws.Message{
 					Type: ws.PeerIdBroadcastMessage,
@@ -356,7 +360,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get inter-handlers channels
-	newClientPeerIdCh, existingClientPeerIdCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, err := server.GetInterHandlersChannels(userId)
+	newClientPeerIdCh, existingClientPeerIdCh, useragentCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, err := server.GetInterHandlersChannels(userId)
 	if err != nil {
 		http.Error(w, "Channel not found", http.StatusUnauthorized)
 		return
@@ -590,8 +594,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Update wallet in DB
-	// note : verify that everything same except for BKs ??
-	userAgent := r.UserAgent()
+	userAgent := <-useragentCh
 	err = server._vault.AddPeer(context.WithValue(r.Context(), types.ContextKey("metadata"), metadata), userId, newClientPeerID, userAgent, mergedDkgResult) // add metadata to context
 	if err != nil {
 		log.Println("Error while storing adding peer in DB:", err)
@@ -646,98 +649,111 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 }
 
 // Returns channels : metadata, adder, new device done, existing device done
-func (server *Server) GetInterHandlersChannels(userId string) (chan string, chan string, chan string, chan *tss.ServerAdd, chan struct{}, chan struct{}, chan struct{}, error) {
+func (server *Server) GetInterHandlersChannels(userId string) (chan string, chan string, chan string, chan string, chan *tss.ServerAdd, chan struct{}, chan struct{}, chan struct{}, error) {
 
 	// NewClientPeerID
 	newClientPeerIdChInterface, ok := server._cache.Get(userId + "-newclientpeeridch")
 	if !ok {
 		log.Println("could not find newClientPeerIdCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	newClientPeerIdCh, ok := newClientPeerIdChInterface.(chan string)
 	if !ok {
 		log.Println("could not assert newClientPeerIdCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// ExistingClientPeerID
 	existingClientPeerIdChInterface, ok := server._cache.Get(userId + "-existingclientpeeridch")
 	if !ok {
 		log.Println("could not find existingClientPeerIdCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	existingClientPeerIdCh, ok := existingClientPeerIdChInterface.(chan string)
 	if !ok {
 		log.Println("could not assert existingClientPeerIdCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+	}
+
+	// User Agent
+	useragentChInterface, ok := server._cache.Get(userId + "-useragentch")
+	if !ok {
+		log.Println("could not find useragentCh in cache")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+	}
+
+	useragentCh, ok := useragentChInterface.(chan string)
+	if !ok {
+		log.Println("could not assert useragentCh")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Metadata
 	metadataChInterface, ok := server._cache.Get(userId + "-metadatach")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	metadataCh, ok := metadataChInterface.(chan string)
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Adder
 	adderChInterface, ok := server._cache.Get(userId + "-adderch")
 	if !ok {
 		log.Println("could not find adderReady in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	adderCh, ok := adderChInterface.(chan *tss.ServerAdd)
 	if !ok {
 		log.Println("could not assert adderReady")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Existing Device TSS Done
 	existingDeviceTssDoneChInterface, ok := server._cache.Get(userId + "-existingdevicetssdonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	existingDeviceTssDoneCh, ok := existingDeviceTssDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// New Device Done
 	newDeivceDoneChInterface, ok := server._cache.Get(userId + "-newdevicedonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	newDeviceDoneCh, ok := newDeivceDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
 	// Existing Device Done
 	existingDeviceDoneChInterface, ok := server._cache.Get(userId + "-existingdevicedonech")
 	if !ok {
 		log.Println("could not find metadataCh in cache")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("channel not found")
 	}
 
 	existingDeviceDoneCh, ok := existingDeviceDoneChInterface.(chan struct{})
 	if !ok {
 		log.Println("could not assert metadataCh")
-		return nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
+		return nil, nil, nil, nil, nil, nil, nil, nil, errors.New("wrong channel")
 	}
 
-	return newClientPeerIdCh, existingClientPeerIdCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, nil
+	return newClientPeerIdCh, existingClientPeerIdCh, useragentCh, metadataCh, adderCh, existingDeviceTssDoneCh, newDeviceDoneCh, existingDeviceDoneCh, nil
 }
