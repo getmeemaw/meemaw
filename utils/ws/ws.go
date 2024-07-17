@@ -43,6 +43,8 @@ type Message struct {
 func TssSend(getNextMessageToSend func() (tss.Message, error), serverDone chan struct{}, errs chan error, ctx context.Context, c *websocket.Conn, functionName string) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-serverDone:
 			return
 		default:
