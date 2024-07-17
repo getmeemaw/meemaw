@@ -147,12 +147,11 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 					continue
 				}
 
-				// READ DEVICE from message
-				device := string(msg.Msg) // verify if sufficient
+				// Read device from message
+				device := string(msg.Msg)
 
 				log.Println("RegisterDeviceHandler - got device from client:", device)
 
-				// WAIT FOR METADATA (channel between registerDeviceHandler & acceptDeviceHandler) AND START ADDER ??
 				metadata = <-metadataCh
 
 				log.Println("RegisterDeviceHandler - got metadata from channel:", metadata)
@@ -185,7 +184,6 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 				log.Println("RegisterDeviceHandler - adder created")
 
 				// Adder & device identifier in Cache (to be used by AcceptDeviceHandler concurrently)
-				// server._cache.Set(userId+"-adder", adder, 10*time.Minute)
 				server._cache.Set(userId+"-device", device, 10*time.Minute)
 				adderCh <- adder
 
@@ -336,10 +334,6 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	close(serverDone)
 	cancel()
 
-	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
-
-	// time.Sleep(200 * time.Millisecond)
-
 	// CLOSE WEBSOCKET
 	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
 }
@@ -462,11 +456,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 				log.Println("AcceptDeviceHandler - metadata from message:", metadata)
 
-				// Metadata in cache (to be used by RegisterDeviceHandler)
-				// server._cache.Set(userId+"-metadata", metadata, 1*time.Minute) // useless if metadataCh ?
-
 				metadataCh <- metadata
-
 				adder = <-adderCh
 
 				log.Println("adder:", adder)
@@ -639,10 +629,6 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 	<-serverDone
 	cancel()
-
-	// COMPARE DKG RESULTS AFTER (same ?)
-
-	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
 
 	// CLOSE WEBSOCKET
 	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
