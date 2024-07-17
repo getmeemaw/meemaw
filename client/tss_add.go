@@ -286,23 +286,10 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	log.Println("RegisterDevice tssDone")
 
 	// Error management
-	select {
-	case processErr := <-errs:
-		if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
-			log.Println("websocket closed normally") // Should not really happen on server side (server is closing)
-		} else if ctx.Err() == context.Canceled {
-			log.Println("websocket closed by context cancellation:", processErr)
-			c.Close(websocket.StatusInternalError, "dkg process failed")
-			// http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return nil, "", nil
-		} else {
-			log.Println("error during websocket connection:", processErr)
-			c.Close(websocket.StatusInternalError, "dkg process failed")
-			// http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return nil, "", nil
-		}
-	default:
-		log.Println("RegisterDevice - no error during TSS")
+	err = ws.ProcessErrors(errs, ctx, c, "RegisterDevice")
+	if err != nil {
+		c.Close(websocket.StatusInternalError, "RegisterDevice process failed")
+		return nil, "", err
 	}
 
 	stage = 40 // only move to next stage after tss process is done
@@ -574,23 +561,10 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	log.Println("AcceptDevice - tssDone")
 
 	// Error management
-	select {
-	case processErr := <-errs:
-		if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
-			log.Println("websocket closed normally") // Should not really happen on server side (server is closing)
-		} else if ctx.Err() == context.Canceled {
-			log.Println("websocket closed by context cancellation:", processErr)
-			c.Close(websocket.StatusInternalError, "dkg process failed")
-			// http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return nil
-		} else {
-			log.Println("error during websocket connection:", processErr)
-			c.Close(websocket.StatusInternalError, "dkg process failed")
-			// http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return nil
-		}
-	default:
-		log.Println("AcceptDevice - no error during TSS")
+	err = ws.ProcessErrors(errs, ctx, c, "AcceptDevice")
+	if err != nil {
+		c.Close(websocket.StatusInternalError, "AcceptDevice process failed")
+		return err
 	}
 
 	stage = 40 // only move to next stage after tss process is done

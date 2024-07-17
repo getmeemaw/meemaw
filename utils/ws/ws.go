@@ -97,3 +97,22 @@ func TssSend(getNextMessageToSend func() (tss.Message, error), serverDone chan s
 		}
 	}
 }
+
+func ProcessErrors(errs chan error, ctx context.Context, c *websocket.Conn, functionName string) error {
+	select {
+	case processErr := <-errs:
+		if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
+			log.Println(functionName, "- websocket closed normally")
+			return nil
+		} else if ctx.Err() == context.Canceled {
+			log.Println(functionName, "- websocket closed by context cancellation:", processErr)
+			return nil
+		} else {
+			log.Println(functionName, "- error during websocket connection:", processErr)
+			return processErr
+		}
+	default:
+		log.Println(functionName, "- no error during TSS")
+		return nil
+	}
+}
