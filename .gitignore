@@ -24,3 +24,4 @@ config.bck.toml
 meemaw
 !client/ios/meemaw-ios/Sources/meemaw
 server/cmd/meemaw.wasm
+test/integration/temp/temp
