@@ -13,6 +13,33 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func AdderGenericHandle(msg *Message, pm *PeerManager, peerID string) error {
+	msgStr, ok := msg.Message.(string)
+	if !ok {
+		log.Println("msg was not a string")
+		return errors.New("msg was not a string")
+	}
+	byteString, err := hex.DecodeString(msgStr)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return err
+	}
+	addMsg := &addshare.Message{}
+	err = proto.Unmarshal(byteString, addMsg)
+	// err = json.Unmarshal(byteString, addMsg)
+	if err != nil {
+		log.Println("ExistingClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
+		return err
+	}
+
+	if msg.PeerID == peerID { // existing client is the target peer
+		return pm.HandleMessage(addMsg)
+	} else {
+		pm.MustSend(msg.PeerID, addMsg)
+		return nil
+	}
+}
+
 //////////
 /// Existing actors
 
@@ -88,23 +115,19 @@ func (p *serviceAddExisting) Process() {
 
 func (p *serviceAddExisting) OnStateChanged(oldState types.MainState, newState types.MainState) {
 
-	log.Println("serviceAddExisting - State changed", "old", oldState.String(), "new", newState.String())
+	// log.Println("serviceAddExisting - State changed", "old", oldState.String(), "new", newState.String())
 
 	if newState == types.StateFailed {
-		log.Println("Signing failed", "old", oldState.String(), "new", newState.String())
-		p.err = fmt.Errorf("signing failed")
+		log.Println("Adding failed", "old", oldState.String(), "new", newState.String())
+		p.err = fmt.Errorf("adding failed")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {
-		// ATTENTION : concurrency problem => once either client or server has finished, he will close the connexion which might kill the last necessary message for the other one
-		// => for now, implemented 1sec delay before closing so that everything can finish correctly
-
-		// log.Println("Signing done", "old", oldState.String(), "new", newState.String())
 		result, err := p.adder.GetResult()
 		if err == nil {
 			p.result = result
 		} else {
-			log.Println("Failed to get result from Signing", "err", err)
+			log.Println("Failed to get result from Adding", "err", err)
 			p.err = err
 		}
 		close(p.done)
@@ -177,23 +200,19 @@ func (p *serviceAddNew) Process() {
 
 func (p *serviceAddNew) OnStateChanged(oldState types.MainState, newState types.MainState) {
 
-	log.Println("serviceAddNew - State changed", "old", oldState.String(), "new", newState.String())
+	// log.Println("serviceAddNew - State changed", "old", oldState.String(), "new", newState.String())
 
 	if newState == types.StateFailed {
-		log.Println("Signing failed", "old", oldState.String(), "new", newState.String())
-		p.err = fmt.Errorf("signing failed")
+		log.Println("Adding failed", "old", oldState.String(), "new", newState.String())
+		p.err = fmt.Errorf("adding failed")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {
-		// ATTENTION : concurrency problem => once either client or server has finished, he will close the connexion which might kill the last necessary message for the other one
-		// => for now, implemented 1sec delay before closing so that everything can finish correctly
-
-		// log.Println("Signing done", "old", oldState.String(), "new", newState.String())
 		result, err := p.adder.GetResult()
 		if err == nil {
 			p.result = result
 		} else {
-			log.Println("Failed to get result from Signing", "err", err)
+			log.Println("Failed to get result from Adding", "err", err)
 			p.err = err
 		}
 		close(p.done)
@@ -314,32 +333,7 @@ func (p *ServerAdd) GetNextMessageToSend(peerID string) (Message, error) {
 
 // Handle messages coming from clients : if the target is the server, consume; else, add to list of messages to be sent through MustSend
 func (p *ServerAdd) HandleMessage(msg *Message) error {
-	// log.Println("HandleMessage server")
-
-	msgStr, ok := msg.Message.(string)
-	if !ok {
-		log.Println("msg was not a string")
-		return errors.New("msg was not a string")
-	}
-	byteString, err := hex.DecodeString(msgStr)
-	if err != nil {
-		log.Println("error decoding hex:", err)
-		return err
-	}
-	addMsg := &addshare.Message{}
-	err = proto.Unmarshal(byteString, addMsg)
-	// err = json.Unmarshal(byteString, addMsg)
-	if err != nil {
-		log.Println("ServerAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
-		return err
-	}
-
-	if msg.PeerID == _serverID { // server is the target peer
-		return p.service.pm.HandleMessage(addMsg)
-	} else {
-		p.service.pm.MustSend(msg.PeerID, addMsg)
-		return nil
-	}
+	return AdderGenericHandle(msg, p.service.pm, _serverID)
 }
 
 // ///////
@@ -392,36 +386,17 @@ func (p *ExistingClientAdd) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, errors.New("could not get client dkg results")
+		return nil, errors.New("could not get ExistingClientAdd dkg results")
 	}
 
-	pubkey := Pubkey{
-		X: p.service.result.PublicKey.GetX(),
-		Y: p.service.result.PublicKey.GetY(),
-	}
-	share := p.service.result.Share.String()
-	BKs := make(map[string]BK)
-
-	addr := pubkey.GetAddress().Hex()
-	pubkeyStr := pubkey.GetStr()
-
-	// Build bks.
-	for peerID, bk := range p.service.result.Bks {
-		BKs[peerID] = BK{
-			X:    bk.GetX().String(),
-			Rank: bk.GetRank(),
-		}
+	res := ProcessResult{
+		PublicKey: p.service.result.PublicKey,
+		Share:     p.service.result.Share,
+		Bks:       p.service.result.Bks,
+		PeerID:    p.peerID,
 	}
 
-	dkgResult := DkgResult{
-		Pubkey:  pubkeyStr,
-		BKs:     BKs,
-		Share:   share,
-		Address: addr,
-		PeerID:  p.peerID,
-	}
-
-	return &dkgResult, nil
+	return PostProcessResult(res)
 }
 
 func (p *ExistingClientAdd) GetNextMessageToSend(peerID string) ([]byte, error) {
@@ -433,32 +408,7 @@ func (p *ExistingClientAdd) GetNextMessageToSendAll() (Message, error) {
 }
 
 func (p *ExistingClientAdd) HandleMessage(msg *Message) error {
-	// log.Println("HandleMessage server")
-
-	msgStr, ok := msg.Message.(string)
-	if !ok {
-		log.Println("msg was not a string")
-		return errors.New("msg was not a string")
-	}
-	byteString, err := hex.DecodeString(msgStr)
-	if err != nil {
-		log.Println("error decoding hex:", err)
-		return err
-	}
-	addMsg := &addshare.Message{}
-	err = proto.Unmarshal(byteString, addMsg)
-	// err = json.Unmarshal(byteString, addMsg)
-	if err != nil {
-		log.Println("ExistingClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
-		return err
-	}
-
-	if msg.PeerID == p.peerID { // existing client is the target peer
-		return p.service.pm.HandleMessage(addMsg)
-	} else {
-		p.service.pm.MustSend(msg.PeerID, addMsg)
-		return nil
-	}
+	return AdderGenericHandle(msg, p.service.pm, p.peerID)
 }
 
 // ///////
@@ -504,36 +454,17 @@ func (p *ClientAdd) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, errors.New("could not get client dkg results")
+		return nil, errors.New("could not get ClientAdd dkg results")
 	}
 
-	pubkey := Pubkey{
-		X: p.service.result.PublicKey.GetX(),
-		Y: p.service.result.PublicKey.GetY(),
-	}
-	share := p.service.result.Share.String()
-	BKs := make(map[string]BK)
-
-	addr := pubkey.GetAddress().Hex()
-	pubkeyStr := pubkey.GetStr()
-
-	// Build bks.
-	for peerID, bk := range p.service.result.Bks {
-		BKs[peerID] = BK{
-			X:    bk.GetX().String(),
-			Rank: bk.GetRank(),
-		}
+	res := ProcessResult{
+		PublicKey: p.service.result.PublicKey,
+		Share:     p.service.result.Share,
+		Bks:       p.service.result.Bks,
+		PeerID:    p.peerID,
 	}
 
-	dkgResult := DkgResult{
-		Pubkey:  pubkeyStr,
-		BKs:     BKs,
-		Share:   share,
-		Address: addr,
-		PeerID:  p.peerID,
-	}
-
-	return &dkgResult, nil
+	return PostProcessResult(res)
 }
 
 func (p *ClientAdd) GetNextMessageToSend(peerID string) ([]byte, error) {
@@ -545,30 +476,5 @@ func (p *ClientAdd) GetNextMessageToSendAll() (Message, error) {
 }
 
 func (p *ClientAdd) HandleMessage(msg *Message) error {
-	// log.Println("HandleMessage server")
-
-	msgStr, ok := msg.Message.(string)
-	if !ok {
-		log.Println("msg was not a string")
-		return errors.New("msg was not a string")
-	}
-	byteString, err := hex.DecodeString(msgStr)
-	if err != nil {
-		log.Println("error decoding hex:", err)
-		return err
-	}
-	addMsg := &addshare.Message{}
-	err = proto.Unmarshal(byteString, addMsg)
-	// err = json.Unmarshal(byteString, addMsg)
-	if err != nil {
-		log.Println("ClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
-		return err
-	}
-
-	if msg.PeerID == p.peerID { // new client is the target peer
-		return p.service.pm.HandleMessage(addMsg)
-	} else {
-		p.service.pm.MustSend(msg.PeerID, addMsg)
-		return nil
-	}
+	return AdderGenericHandle(msg, p.service.pm, p.peerID)
 }
