@@ -8,39 +8,14 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
+	"github.com/getmeemaw/meemaw/utils/ws"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
-
-type MessageType struct { // should be in utils/ws.go ? (with the rest below)
-	MsgType  string `json:"msgType"`
-	MsgStage uint32 `json:"msgStage"`
-}
-
-var (
-	PeerIdBroadcastMessage        = MessageType{MsgType: "peer", MsgStage: 10}
-	DeviceMessage                 = MessageType{MsgType: "device", MsgStage: 20}       // new device to server (=> respond with pubkey)
-	PubkeyMessage                 = MessageType{MsgType: "pubkey", MsgStage: 20}       // server to new device (=> start TSS on new device)
-	PubkeyAckMessage              = MessageType{MsgType: "pubkey-ack", MsgStage: 30}   // new device to server (=> start TSS msg management on server registerHandler)
-	MetadataMessage               = MessageType{MsgType: "metadata", MsgStage: 20}     // old device to server (before TSS) ; server to new device (after TSS)
-	MetadataAckMessage            = MessageType{MsgType: "metadata-ack", MsgStage: 30} // server to old device (=> start TSS)
-	TssMessage                    = MessageType{MsgType: "tss", MsgStage: 40}
-	TssDoneMessage                = MessageType{MsgType: "tss-done", MsgStage: 50}
-	EverythingStoredClientMessage = MessageType{MsgType: "stored-client", MsgStage: 70}
-	ExistingDeviceDoneMessage     = MessageType{MsgType: "existing-device-done", MsgStage: 80}
-	NewDeviceDoneMessage          = MessageType{MsgType: "new-device-done", MsgStage: 80}
-	ErrorMessage                  = MessageType{MsgType: "error", MsgStage: 0}
-)
-
-type Message struct {
-	Type MessageType `json:"type"`
-	Msg  string      `json:"payload"`
-}
 
 type PublicWallet struct {
 	PublicKey tss.PubkeyStr
@@ -111,7 +86,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 	go func() {
 		for {
-			var msg Message
+			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
@@ -137,7 +112,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 			// log.Println("received message in RegisterDeviceHandler:", msg)
 
 			switch msg.Type {
-			case PeerIdBroadcastMessage:
+			case ws.PeerIdBroadcastMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
 					log.Println("Device message but we're at later stage; stage:", stage)
@@ -149,8 +124,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 				newClientPeerIdCh <- newClientPeerID
 				existingClientPeerID = <-existingClientPeerIdCh
 
-				PeerIdBroadcastMsg := Message{
-					Type: PeerIdBroadcastMessage,
+				PeerIdBroadcastMsg := ws.Message{
+					Type: ws.PeerIdBroadcastMessage,
 					Msg:  existingClientPeerID,
 				}
 				err = wsjson.Write(ctx, c, PeerIdBroadcastMsg)
@@ -160,7 +135,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 					return
 				}
 
-			case DeviceMessage:
+			case ws.DeviceMessage:
 				// verify stage : if device message but we're at tss stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
@@ -224,8 +199,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 					return
 				}
 				payload := hex.EncodeToString(walletJSON)
-				pubkeyMsg := Message{
-					Type: PubkeyMessage,
+				pubkeyMsg := ws.Message{
+					Type: ws.PubkeyMessage,
 					Msg:  payload,
 				}
 				err = wsjson.Write(ctx, c, pubkeyMsg)
@@ -241,7 +216,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 				// update stage
 				stage = 30
 
-			case TssMessage:
+			case ws.TssMessage:
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
@@ -273,7 +248,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 					return
 				}
 
-			case EverythingStoredClientMessage:
+			case ws.EverythingStoredClientMessage:
 				// note : have a timer somewhere, if after X seconds we don't have this message, then it means the process failed.
 				log.Println("RegisterDeviceHandler - received EverythingStoredClientMessage")
 
@@ -282,7 +257,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 			default:
 				log.Println("Unexpected message type:", msg.Type)
-				errorMsg := Message{Type: ErrorMessage, Msg: "error: Unexpected message type"}
+				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
 					log.Println("error writing json through websocket:", err)
@@ -301,61 +276,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	tssDone := adder.GetDoneChan()
 
 	// TSS sending and listening for finish signal
-	go func() {
-		for {
-			select {
-			case <-serverDone: // for the server, don't stop communcation straight when TSS is done (communication can still happen between clients)
-				return
-			default:
-				tssMsg, err := adder.GetNextMessageToSend(newClientPeerID)
-				if err != nil {
-					if strings.Contains(err.Error(), "no message to be sent") {
-						continue
-					}
-					log.Println("RegisterDeviceHandler - error getting next message:", err)
-					errs <- err
-					return
-				}
-
-				if len(tssMsg.PeerID) == 0 {
-					continue
-				}
-
-				log.Println("RegisterDeviceHandler - got next message to send to", newClientPeerID, ":", tssMsg)
-
-				// format message for communication
-				jsonEncodedMsg, err := json.Marshal(tssMsg)
-				if err != nil {
-					log.Println("could not marshal tss msg:", err)
-					errs <- err
-					return
-				}
-
-				payload := hex.EncodeToString(jsonEncodedMsg)
-
-				msg := Message{
-					Type: TssMessage,
-					Msg:  payload,
-				}
-
-				// log.Println("trying send, next encoded message to send:", encodedMsg)
-
-				if tssMsg.Message != nil {
-					// log.Println("trying to send message:", encodedMsg)
-					err := wsjson.Write(ctx, c, msg)
-					if err != nil {
-						log.Println("error writing json through websocket:", err)
-						errs <- err
-						return
-					}
-
-					log.Println("RegisterDeviceHandler - sent TssMsg message:", msg)
-				}
-
-				time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready
-			}
-		}
-	}()
+	go ws.TssSend(func() (tss.Message, error) { return adder.GetNextMessageToSend(newClientPeerID) }, serverDone, errs, ctx, c, "RegisterDeviceHandler")
 
 	// start finishing steps after tss process => sending metadata
 	<-tssDone
@@ -390,8 +311,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	log.Println("RegisterDeviceHandler - <-existingDeviceTssDoneCh => sending MetadataMessage")
 
 	// Send metadata to new device
-	ack := Message{
-		Type: MetadataMessage,
+	ack := ws.Message{
+		Type: ws.MetadataMessage,
 		Msg:  metadata,
 	}
 	err = wsjson.Write(ctx, c, ack)
@@ -407,8 +328,8 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 	log.Println("RegisterDeviceHandler - sending ExistingDeviceDoneMessage")
 
 	// send existingDeviceDoneMessage to new device
-	existingDeviceDoneMsg := Message{
-		Type: ExistingDeviceDoneMessage,
+	existingDeviceDoneMsg := ws.Message{
+		Type: ws.ExistingDeviceDoneMessage,
 		Msg:  "",
 	}
 	err = wsjson.Write(ctx, c, existingDeviceDoneMsg)
@@ -488,7 +409,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 	go func() {
 		for {
-			var msg Message
+			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
@@ -514,7 +435,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 			// log.Println("received message in AcceptDeviceHandler:", msg)
 
 			switch msg.Type {
-			case PeerIdBroadcastMessage:
+			case ws.PeerIdBroadcastMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
 					log.Println("Device message but we're at later stage; stage:", stage)
@@ -526,8 +447,8 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 				existingClientPeerIdCh <- existingClientPeerID
 				newClientPeerID = <-newClientPeerIdCh
 
-				PeerIdBroadcastMsg := Message{
-					Type: PeerIdBroadcastMessage,
+				PeerIdBroadcastMsg := ws.Message{
+					Type: ws.PeerIdBroadcastMessage,
 					Msg:  newClientPeerID,
 				}
 				err = wsjson.Write(ctx, c, PeerIdBroadcastMsg)
@@ -537,7 +458,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 					return
 				}
 
-			case MetadataMessage:
+			case ws.MetadataMessage:
 				// verify stage : if device message but we're at tss stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
@@ -559,8 +480,8 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 				log.Println("adder:", adder)
 
 				// send MetadataAckMessage (so that client can start tss process on his side)
-				ack := Message{
-					Type: MetadataAckMessage,
+				ack := ws.Message{
+					Type: ws.MetadataAckMessage,
 					Msg:  "",
 				}
 				err := wsjson.Write(ctx, c, ack)
@@ -576,7 +497,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 				// update stage
 				stage = 30
 
-			case TssMessage:
+			case ws.TssMessage:
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
@@ -608,7 +529,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 					return
 				}
 
-			case TssDoneMessage:
+			case ws.TssDoneMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
 					log.Println("TSS message but we're at later stage; stage:", stage)
@@ -619,7 +540,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 				existingDeviceTssDoneCh <- struct{}{}
 
-			case ExistingDeviceDoneMessage:
+			case ws.ExistingDeviceDoneMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
 					log.Println("TSS message but we're at later stage; stage:", stage)
@@ -634,7 +555,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 
 			default:
 				log.Println("Unexpected message type:", msg.Type)
-				errorMsg := Message{Type: ErrorMessage, Msg: "error: Unexpected message type"}
+				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
 					log.Println("error writing json through websocket:", err)
@@ -653,61 +574,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	tssDone := adder.GetDoneChan()
 
 	// TSS sending and listening for finish signal
-	go func() {
-		for {
-			select {
-			case <-serverDone: // for the server, don't stop communcation straight when TSS is done (communication can still happen between clients)
-				return
-			default:
-				tssMsg, err := adder.GetNextMessageToSend(existingClientPeerID)
-				if err != nil {
-					if strings.Contains(err.Error(), "no message to be sent") {
-						continue
-					}
-					log.Println("AcceptDeviceHandler - error getting next message:", err)
-					errs <- err
-					return
-				}
-
-				if len(tssMsg.PeerID) == 0 {
-					continue
-				}
-
-				log.Println("AcceptDeviceHandler - got next message to send to", existingClientPeerID, ":", tssMsg)
-
-				// format message for communication
-				jsonEncodedMsg, err := json.Marshal(tssMsg)
-				if err != nil {
-					log.Println("could not marshal tss msg:", err)
-					errs <- err
-					return
-				}
-
-				payload := hex.EncodeToString(jsonEncodedMsg)
-
-				msg := Message{
-					Type: TssMessage,
-					Msg:  payload,
-				}
-
-				// log.Println("trying send, next encoded message to send:", encodedMsg)
-
-				if tssMsg.Message != nil {
-					// log.Println("trying to send message:", encodedMsg)
-					err := wsjson.Write(ctx, c, msg)
-					if err != nil {
-						log.Println("error writing json through websocket:", err)
-						errs <- err
-						return
-					}
-
-					log.Println("AcceptDeviceHandler - sent TssMsg message:", msg)
-				}
-
-				time.Sleep(10 * time.Millisecond) // UPDATE : remove polling, use channels to trigger send when next TSS message ready
-			}
-		}
-	}()
+	go ws.TssSend(func() (tss.Message, error) { return adder.GetNextMessageToSend(existingClientPeerID) }, serverDone, errs, ctx, c, "AcceptDeviceHandler")
 
 	originalDkgResult := adder.GetOriginalWallet()
 
@@ -778,8 +645,8 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 	log.Println("AcceptDeviceHandler - sending NewDeviceDoneMessage")
 
 	// send newDeviceDoneMessage to existing device
-	newDeviceDoneMsg := Message{
-		Type: NewDeviceDoneMessage,
+	newDeviceDoneMsg := ws.Message{
+		Type: ws.NewDeviceDoneMessage,
 		Msg:  "",
 	}
 	err = wsjson.Write(ctx, c, newDeviceDoneMsg)

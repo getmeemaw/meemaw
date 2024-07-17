@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
+	"github.com/getmeemaw/meemaw/utils/ws"
 	"github.com/google/uuid"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -32,118 +32,6 @@ func Identify(host, authData string) (string, error) {
 
 // Dkg performs the full dkg process on the client side
 // Requires authData (to confirm authorization and identify user) and host
-// func Dkg(host, authData string) (*tss.DkgResult, string, error) {
-// 	// Get temporary access token from server based on auth data
-// 	token, err := getAccessToken(host, "", authData)
-// 	if err != nil {
-// 		log.Println("error getting access token:", err)
-// 		return nil, "", err
-// 	}
-
-// 	// Prepare DKG process
-// 	path := "/dkg?token=" + token
-
-// 	_host, err := urlToWs(host)
-// 	if err != nil {
-// 		log.Println("error getting ws host:", err)
-// 		return nil, "", err
-// 	}
-
-// 	clientPeerID := uuid.New().String()
-// 	if strings.HasSuffix(os.Args[0], ".test") {
-// 		clientPeerID = "client"
-// 	}
-// 	clientPeerID = "client" // REMOVE - once dkg & sign processes are updated with proper message management (incl. exchange of peerID)
-
-// 	dkg, err := tss.NewClientDkg(clientPeerID)
-// 	if err != nil {
-// 		return nil, "", err
-// 	}
-
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-// 	defer cancel()
-
-// 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
-// 	if err != nil {
-// 		if resp.StatusCode == 401 {
-// 			return nil, "", &types.ErrUnauthorized{}
-// 		} else if resp.StatusCode == 400 {
-// 			return nil, "", &types.ErrBadRequest{}
-// 		} else if resp.StatusCode == 404 {
-// 			return nil, "", &types.ErrNotFound{}
-// 		} else if resp.StatusCode == 409 {
-// 			return nil, "", &types.ErrConflict{}
-// 		} else {
-// 			log.Println("error dialing websocket:", err)
-// 			return nil, "", err
-// 		}
-// 	}
-// 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
-
-// 	errs := make(chan error, 2)
-
-// 	go tss.Send(dkg, ctx, errs, c)
-// 	go tss.Receive(dkg, ctx, errs, c)
-
-// 	// Start DKG process.
-// 	res, err := dkg.Process()
-// 	if err != nil {
-// 		return nil, "", err
-// 	}
-
-// 	// Error management
-// 	processErr := <-errs // wait for websocket closure from server
-// 	if ctx.Err() == context.Canceled {
-// 		log.Println("websocket closed by context cancellation:", processErr)
-// 		return nil, "", processErr
-// 	} else if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
-// 		log.Println("websocket closed normally")
-// 		cancel()
-// 	} else {
-// 		log.Println("error during websocket connection:", processErr) // it's ok, as the proper completion will be verified with /dkgtwo
-// 		cancel()
-// 	}
-
-// 	//////////
-// 	/// METADATA
-
-// 	_host, err = urlToHttp(host)
-// 	if err != nil {
-// 		log.Println("error getting http host:", err)
-// 		return nil, "", err
-// 	}
-
-// 	// Get metadata from /dkgtwo
-// 	path = "/dkgtwo?token=" + token
-// 	resp, err = http.Get(_host + path)
-// 	if err != nil {
-// 		log.Println("failed to call dkgtwo:", err)
-// 		return nil, "", err
-// 	}
-// 	defer resp.Body.Close() // Ensure the response body is closed
-
-// 	if resp.StatusCode != 200 {
-// 		log.Println("error during dkgtwo:", resp.Status)
-// 		return nil, "", errors.New("error during dkgtwo")
-// 	}
-
-// 	// Read the response body
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		log.Fatalf("Failed to read response body: %v", err)
-// 	}
-
-// 	metadata := string(body)
-
-// 	log.Println("client.go dkg - metadata:", metadata)
-
-// 	// time.Sleep(120 * time.Hour) // debug
-
-// 	// c.Close(websocket.StatusNormalClosure, "")
-
-// 	return res, metadata, nil
-// }
-
 func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, "", authData)
@@ -215,8 +103,8 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	var metadata string
 
 	// send peerID
-	peerIdMsg := server.Message{
-		Type: server.PeerIdBroadcastMessage,
+	peerIdMsg := ws.Message{
+		Type: ws.PeerIdBroadcastMessage,
 		Msg:  peerID,
 	}
 	err = wsjson.Write(ctx, c, peerIdMsg)
@@ -229,7 +117,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	go func() {
 		for {
 			log.Println("Dkg - wsjson.Read")
-			var msg server.Message
+			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
@@ -255,7 +143,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 			log.Println("received message in Dkg:", msg)
 
 			switch msg.Type {
-			case server.TssMessage:
+			case ws.TssMessage:
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
@@ -293,7 +181,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 				log.Println("Dkg - tssMsg handled")
 
-			case server.MetadataMessage:
+			case ws.MetadataMessage:
 				// note : have a timer somewhere, if after X seconds we don't have this message, then it means the process failed.
 
 				// update metadata to return it at the end
@@ -304,8 +192,8 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				//
 
 				// SEND MetadataAckMessage
-				ack := server.Message{
-					Type: server.MetadataAckMessage,
+				ack := ws.Message{
+					Type: ws.MetadataAckMessage,
 					Msg:  "",
 				}
 				err = wsjson.Write(ctx, c, ack)
@@ -319,7 +207,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 			default:
 				log.Println("Unexpected message type:", msg.Type)
-				errorMsg := server.Message{Type: server.ErrorMessage, Msg: "error: Unexpected message type"}
+				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
 					log.Println("RegisterDevice - errorMsg - error writing json through websocket:", err)
@@ -331,69 +219,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	}()
 
 	// TSS sending and listening for finish signal
-	go func() {
-		var counter int
-
-		for {
-			select {
-			case <-serverDone:
-				return
-			default:
-				// Get next message to send (either server or other devices)
-				tssMsg, err := dkg.GetNextMessageToSend()
-				if err != nil {
-					if strings.Contains(err.Error(), "no message to be sent") {
-						time.Sleep(10 * time.Millisecond)
-						continue
-					}
-					log.Println("error getting next message:", err)
-					errs <- err
-					return
-				}
-
-				if len(tssMsg.PeerID) == 0 {
-					if counter > 100 {
-						log.Println("no more messages it seems like")
-						return
-					}
-					counter++
-					continue
-				}
-
-				log.Println("got next message to send:", tssMsg)
-
-				// format message for communication
-				jsonEncodedMsg, err := json.Marshal(tssMsg)
-				if err != nil {
-					log.Println("could not marshal tss msg:", err)
-					errs <- err
-					return
-				}
-
-				payload := hex.EncodeToString(jsonEncodedMsg)
-
-				msg := server.Message{
-					Type: server.TssMessage,
-					Msg:  payload,
-				}
-
-				// log.Println("trying send, next encoded message to send:", encodedMsg)
-
-				if tssMsg.Message != nil {
-					log.Println("Dkg - trying to send message:", tssMsg.Message)
-					err := wsjson.Write(ctx, c, msg)
-					if err != nil {
-						log.Println("RegisterDevice - tss message - error writing json through websocket:", err)
-						errs <- err
-						return
-					}
-					log.Println("Dkg - message sent")
-				}
-
-				time.Sleep(10 * time.Millisecond)
-			}
-		}
-	}()
+	go ws.TssSend(dkg.GetNextMessageToSend, serverDone, errs, ctx, c, "Dkg")
 
 	// Start adder
 	dkgResult, err := dkg.Process()
