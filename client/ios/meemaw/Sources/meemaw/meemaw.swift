@@ -150,6 +150,20 @@ public struct Wallet: EthereumAccountProtocol {
 
         return SignedTransaction(transaction: transaction, signature: signature)
     }
+
+    public func Recover() throws -> String {
+        let ret = TsslibRecover(self.server, self.wallet, self.auth)
+
+        if let privateKey = ret {
+            if privateKey.successful {
+                return "0x"+privateKey.result
+            } else {
+                print(privateKey.error)
+            }
+        }
+
+        throw TssError.recoverError
+    }
 }
 
 enum EthereumSignerError: Error {
@@ -161,6 +175,7 @@ enum TssError: Error {
     case identifyError
     case dkgError
     case signError
+    case recoverError
 }
 
 public struct Meemaw {

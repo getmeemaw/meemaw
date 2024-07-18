@@ -43,6 +43,20 @@ func Sign(host string, message []byte, dkgResultStr string, authData string) *Sw
 	return swiftResultSignature(signature, nil)
 }
 
+func Recover(host string, dkgResultStr string, authData string) *SwiftResultString {
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	privateKey, err := client.Recover(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+	return swiftResultString(privateKey, nil)
+}
+
 type upgradedDkgResult struct {
 	DkgResultStr string
 	Metadata     string
