@@ -164,6 +164,20 @@ public struct Wallet: EthereumAccountProtocol {
 
         throw TssError.recoverError
     }
+
+    public func AcceptDevice() throws -> Void {
+        let ret = TsslibAcceptDevice(self.server, self.wallet, self.auth)
+
+        if let res = ret {
+            if res.successful {
+                return
+            } else {
+                print(res.error)
+            }
+        }
+
+        throw TssError.acceptError
+    }
 }
 
 enum EthereumSignerError: Error {
@@ -174,6 +188,9 @@ enum EthereumSignerError: Error {
 enum TssError: Error {
     case identifyError
     case dkgError
+    case walletExistsError
+    case registerError
+    case acceptError
     case signError
     case recoverError
 }
@@ -186,7 +203,7 @@ public struct Meemaw {
     }
     
     // GetWallet returns the wallet if it exists or creates a new one
-    public func GetWallet(auth: String) async throws -> Wallet {
+    public func GetWallet(auth: String, callbackRegisterStarted: ((String) -> Void)? = nil, callbackRegisterDone: ((String) -> Void)? = nil) async throws -> Wallet {
         
         var dkgResult = ""
         
@@ -219,16 +236,43 @@ public struct Meemaw {
             throw error
         }
 
+        var walletExistsServer = false
+
         // 2. If nothing stored : Dkg
         do {
             dkgResult = try dkg(auth: auth)
+        } catch TssError.walletExistsError {
+            print("Wallet already exists on server side. Registering device.")
+            walletExistsServer = true
         } catch {
             print("Error while dkg")
             throw error
         }
 
+        // 3. Register if needed
+        if walletExistsServer {
+            do {
+                if let callbackRegisterStarted = callbackRegisterStarted {
+                    callbackRegisterStarted("devicecode")
+                } else {
+                    print("register device started, but no callback function provided")
+                }
+
+                dkgResult = try registerDevice(auth: auth)
+
+                if let callbackRegisterDone = callbackRegisterDone {
+                    callbackRegisterDone("devicecode")
+                } else {
+                    print("register device is done, but no callback function provided")
+                }
+            } catch {
+                print("Error while registering device")
+                throw error
+            }
+        }
+
         // 3. Store
-        do{
+        do {
             try StoreWallet(dkgResult: dkgResult, userId: userId)
         } catch {
             print("Error while storing wallet")
@@ -245,12 +289,30 @@ public struct Meemaw {
         if let dkg = ret {
             if dkg.successful {
                 return dkg.result
+            } else if dkg.error == "conflict" {
+                throw TssError.walletExistsError
+            } else {
+                print(dkg.error)
+            }
+        }
+        
+        throw TssError.dkgError
+    }
+    
+    private func registerDevice(auth: String) throws -> String {
+        
+        let ret = TsslibRegisterDevice(self._server, auth)
+
+        if let dkg = ret {
+            if dkg.successful {
+                return dkg.result
             } else {
                 print(dkg.error)
             }
         }
 
-        throw TssError.dkgError
+
+        throw TssError.registerError
     }
     
     enum WalletStorageError: Error {

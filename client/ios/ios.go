@@ -29,6 +29,31 @@ func Dkg(host string, authData string) *SwiftResultString {
 	return swiftResultDkg(dkgResult, metadata, nil)
 }
 
+func RegisterDevice(host string, authData string) *SwiftResultString {
+
+	dkgResult, metadata, err := client.RegisterDevice(host, authData, "ios")
+	if err != nil {
+		return swiftResultDkg(nil, "", err)
+	}
+
+	return swiftResultDkg(dkgResult, metadata, nil)
+}
+
+func AcceptDevice(host string, dkgResultStr string, authData string) *SwiftResultString {
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	err = client.AcceptDevice(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	return swiftResultString("", nil)
+}
+
 func Sign(host string, message []byte, dkgResultStr string, authData string) *SwiftResultBytes {
 	var upgradedDkgResult upgradedDkgResult
 	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
