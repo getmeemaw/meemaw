@@ -155,7 +155,7 @@ export default class Meemaw {
         // If conflict error (= wallet already exists on server side), try RegisterDevice
         try{
             if (typeof callbackRegisterStarted === 'function') {
-                callbackRegisterStarted(deviceCode);
+                callbackRegisterStarted("deviceCode");
             } else {
                 console.warn('register device started, but no callback function provided')
             }
@@ -166,7 +166,7 @@ export default class Meemaw {
             this.storeDkgResults(userId, newDkgResult, parsedResp.dkgResult.Address, parsedResp.metadata);
 
             if (typeof callbackRegisterDone === 'function') {
-                callbackRegisterDone(deviceCode);
+                callbackRegisterDone("deviceCode");
             } else {
                 console.warn('register device is done, but no callback function provided')
             }
