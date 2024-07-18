@@ -204,15 +204,23 @@ public struct Meemaw {
             throw error
         }
 
-        // 2. If nothing stored : Dkg + store
+        // 2. If nothing stored : Dkg
         do {
             dkgResult = try dkg(auth: auth)
-            try StoreWallet(dkgResult: dkgResult, userId: userId)
-            return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
         } catch {
-            print("Error while dkg or storing wallet")
+            print("Error while dkg")
             throw error
         }
+
+        // 3. Store
+        do{
+            try StoreWallet(dkgResult: dkgResult, userId: userId)
+        } catch {
+            print("Error while storing wallet")
+            throw error
+        }
+
+        return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
     }
     
     private func dkg(auth: String) throws -> String {
@@ -223,7 +231,6 @@ public struct Meemaw {
             if dkg.successful {
                 return dkg.result
             } else {
-                print("error when dkg:")
                 print(dkg.error)
             }
         }
@@ -289,14 +296,22 @@ public struct Meemaw {
     private func GetAddressFromDkgResult(dkgResult: String) throws -> String {
         if let data = dkgResult.data(using: .utf8) {
             do {
-                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let address = json["Address"] as? String {
+                print("test1")
+                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                let dkgResultStr = json["DkgResultStr"] as? String,
+                let dkgResultData = dkgResultStr.data(using: .utf8),
+                let dkgResultJson = try JSONSerialization.jsonObject(with: dkgResultData, options: []) as? [String: Any],
+                let address = dkgResultJson["Address"] as? String {
+                    print("test2:", address)
                     return address
                 }
+                print("test3")
             } catch {
                 print("Error parsing JSON: \(error)")
                 throw error
             }
         }
+        print("test4")
         
         throw NSError(domain: NSCocoaErrorDomain, code: NSPropertyListReadCorruptError, userInfo: nil)
     }

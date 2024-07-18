@@ -43,8 +43,19 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Prepare DKG process
 	path := "/dkg?token=" + token
 
+	_hostHttp, err := urlToHttp(host)
+	if err != nil {
+		log.Println("error getting http host:", err)
+		return nil, "", err
+	}
+
 	// Check if wallet already exists
-	resp, err := http.Get(host + path)
+	resp, err := http.Get(_hostHttp + path)
+	if err != nil {
+		log.Println("error dialing dkg (first call):", err)
+		return nil, "", err
+	}
+
 	if resp.StatusCode == 401 {
 		return nil, "", &types.ErrUnauthorized{}
 	} else if resp.StatusCode == 400 {
@@ -59,10 +70,6 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	} else {
 		log.Println("error dialing dkg (first call):", err)
 		return nil, "", errors.New("error dialing dkg (first call)")
-	}
-	if err != nil {
-		log.Println("error dialing dkg (first call):", err)
-		return nil, "", err
 	}
 	defer resp.Body.Close()
 
