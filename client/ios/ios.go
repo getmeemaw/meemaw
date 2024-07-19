@@ -54,6 +54,20 @@ func AcceptDevice(host string, dkgResultStr string, authData string) *SwiftResul
 	return swiftResultString("", nil)
 }
 
+func Backup(host string, dkgResultStr string, authData string) *SwiftResultString {
+	// UPDATE
+	// ATTENTION : needs to be same format as web (and all platforms) => harmonize at client.go level ??
+
+	return nil
+}
+
+func FromBackup(host string, backup string, authData string) *SwiftResultString {
+	// UPDATE
+	// ATTENTION : needs to be same format as web (and all platforms) => harmonize at client.go level ??
+
+	return nil
+}
+
 func Sign(host string, message []byte, dkgResultStr string, authData string) *SwiftResultBytes {
 	var upgradedDkgResult upgradedDkgResult
 	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
