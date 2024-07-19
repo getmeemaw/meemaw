@@ -28,6 +28,8 @@ func main() {
 	js.Global().Set("Dkg", asyncFunc(Dkg))
 	js.Global().Set("RegisterDevice", asyncFunc(RegisterDevice))
 	js.Global().Set("AcceptDevice", asyncFunc(AcceptDevice))
+	js.Global().Set("Backup", asyncFunc(Backup))
+	js.Global().Set("FromBackup", asyncFunc(FromBackup))
 	js.Global().Set("SignBytes", asyncFunc(SignBytes))
 	// js.Global().Set("SignEthMessage", asyncFunc(SignEthMessage))
 	js.Global().Set("SignEthTransaction", asyncFunc(SignEthTransaction))
@@ -119,9 +121,84 @@ func AcceptDevice(this js.Value, args []js.Value) (any, error) {
 	err := client.AcceptDevice(host, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while acceptDevice:", err)
+		return nil, err
 	}
 
 	return nil, err
+}
+
+// input : host, dkgResultStr, metadata, authData
+// output : backup, error
+func Backup(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	dkgResultStr := args[1].String()
+	metadata := args[2].String()
+	authData := args[3].String()
+
+	dkgResult, metadata, err := client.Backup(host, dkgResultStr, metadata, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return nil, err
+	}
+
+	resp := dkgResponse{
+		DkgResult: dkgResult,
+		Metadata:  metadata,
+	}
+
+	respJSON, err := json.Marshal(resp)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return nil, err
+	}
+
+	return hex.EncodeToString(respJSON), err
+}
+
+// input : host, backup, authData
+// output : json encoded dkgResult, error
+func FromBackup(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	backup := args[1].String()
+	authData := args[2].String()
+
+	backupBytes, err := hex.DecodeString(backup)
+	if err != nil {
+		log.Println("error while Backup (hex decode):", err)
+		return nil, err
+	}
+
+	var backupDkgResult dkgResponse
+	err = json.Unmarshal(backupBytes, &backupDkgResult)
+	if err != nil {
+		log.Println("error while Backup (json unmarshal):", err)
+		return nil, err
+	}
+
+	backupDkgResultStr, err := json.Marshal(backupDkgResult.DkgResult) // not great, as it will be unmarshalled down the line again...
+	if err != nil {
+		log.Println("error while Backup (json marshal):", err)
+		return nil, err
+	}
+
+	dkgResult, metadata, err := client.Backup(host, string(backupDkgResultStr), backupDkgResult.Metadata, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return nil, err
+	}
+
+	resp := dkgResponse{
+		DkgResult: dkgResult,
+		Metadata:  metadata,
+	}
+
+	respJSON, err := json.Marshal(resp)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return nil, err
+	}
+
+	return string(respJSON), err
 }
 
 // input : host, message (hex encoded bytes), dkgResultStr, authData

@@ -22,7 +22,7 @@ type PublicWallet struct {
 	BKs       map[string]tss.BK
 }
 
-// UPDATE DESCRIPTION
+// RegisterDeviceHandler is called by a new device wanting to "join" the wallet by creating a new share for itself, in collaboration with existing peers
 func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
@@ -342,7 +342,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
 
-// UPDATE DESCRIPTION
+// AcceptDeviceHandler is called by a device already part of the TSS wallet. In collaboration with the server and the new device, a new share is created for the new device
 func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get userId and access token from context

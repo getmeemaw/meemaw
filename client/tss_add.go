@@ -317,15 +317,6 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 // UPDATE DESCRIPTION
 func AcceptDevice(host string, dkgResultStr string, metadata string, authData string) error {
 
-	// send metadata, use dkgResults to create adder, etc
-
-	// messages received:
-	// - metadataAck
-	// - tss
-	// - some form of finishing message?
-
-	//////////
-
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
@@ -599,4 +590,50 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
 
 	return nil // UPDATE
+}
+
+//////////////////////////
+//////////////////////////
+///////// BACKUP /////////
+//////////////////////////
+//////////////////////////
+
+// Backup combines RegisterDevice and AcceptDevice to create a backup share of the TSS wallet
+// It can be used both to create a backup from a registered device, or to register the device based on a backup
+// Note: the implementation could be more performant by avoiding the full process of multi-devices
+// Note: this would reduce the memory used (channels cached, etc) but create another piece of code that needs to be maintained
+// Note: performance is really good for multi-device, let's see if we end up needing to upgrade
+func Backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, string, error) {
+	newClientDone := make(chan struct{})
+	var dkgResultNewClient *tss.DkgResult
+	var metadataNewClient string
+
+	var err error
+
+	go func() {
+		log.Println("Backup - starting registerDevice")
+		dkgResultNewClient, metadataNewClient, err = RegisterDevice(host, authData, "backup")
+		if err != nil {
+			log.Println("Error registerDevice:", err)
+			return
+		}
+
+		newClientDone <- struct{}{}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	log.Println("Backup - starting acceptDevice")
+
+	err = AcceptDevice(host, dkgResultStr, metadata, authData)
+	if err != nil {
+		log.Println("Error acceptDevice:", err)
+		return nil, "", err
+	}
+
+	log.Println("client.Backup done")
+
+	<-newClientDone
+
+	return dkgResultNewClient, metadataNewClient, nil
 }

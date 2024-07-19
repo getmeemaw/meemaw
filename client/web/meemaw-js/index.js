@@ -78,6 +78,16 @@ export class Wallet {
             throw error;
         }
     }
+
+    // Backup runs the TSS process of adding a backup to the TSS wallet
+    async Backup() {
+        try {
+            return await window.Backup(this.host, this.dkgResult, this.metadata, this.authData);
+        } catch (error) {
+            console.log("error while accepting device:", error)
+            throw error;
+        }
+    }
 }
 
 export default class Meemaw {
@@ -107,7 +117,7 @@ export default class Meemaw {
             throw new Error('authData is empty');
         }
 
-        // Check if wallet already exists
+        // Get userId
         let userId;
         try {
             userId = await window.Identify(this.host, authData)
@@ -116,6 +126,7 @@ export default class Meemaw {
             throw error;
         }
 
+        // Check if wallet already exists
         const storedDkgResult = window.localStorage.getItem(localStorageKeys.dkgResult+"-"+userId);
         const storedAddress = window.localStorage.getItem(localStorageKeys.address+"-"+userId);
         const storedMetadata = window.localStorage.getItem(localStorageKeys.metadata+"-"+userId);
@@ -174,6 +185,35 @@ export default class Meemaw {
             return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
         } catch(error) {
             console.log("error while registering device:", error)
+            throw error;
+        }
+    }
+
+    // GetWallet returns the wallet if it exists or creates a new one
+    async GetWalletFromBackup(authData, backup) {
+        if (!authData) {
+            throw new Error('authData is empty');
+        }
+
+        // Get userId
+        let userId;
+        try {
+            userId = await window.Identify(this.host, authData)
+        } catch (error) {
+            console.log("error getting userId:", error)
+            throw error;
+        }
+
+        try {
+            const resp = await window.FromBackup(this.host, backup, authData);
+            const parsedResp = JSON.parse(resp);
+            const newDkgResult = JSON.stringify(parsedResp.dkgResult);
+
+            this.storeDkgResults(userId, newDkgResult, parsedResp.dkgResult.Address, parsedResp.metadata);
+
+            return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
+        } catch(error) {
+            console.log("error while getting wallet from backup:", error)
             throw error;
         }
     }
