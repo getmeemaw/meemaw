@@ -598,12 +598,12 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 //////////////////////////
 //////////////////////////
 
-// Backup combines RegisterDevice and AcceptDevice to create a backup share of the TSS wallet
+// backup combines RegisterDevice and AcceptDevice to create a backup share of the TSS wallet
 // It can be used both to create a backup from a registered device, or to register the device based on a backup
 // Note: the implementation could be more performant by avoiding the full process of multi-devices
 // Note: this would reduce the memory used (channels cached, etc) but create another piece of code that needs to be maintained
 // Note: performance is really good for multi-device, let's see if we end up needing to upgrade
-func Backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, string, error) {
+func backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, string, error) {
 	newClientDone := make(chan struct{})
 	var dkgResultNewClient *tss.DkgResult
 	var metadataNewClient string
@@ -636,4 +636,55 @@ func Backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, stri
 	<-newClientDone
 
 	return dkgResultNewClient, metadataNewClient, nil
+}
+
+func Backup(host, dkgResultStr, metadata, authData string) (string, error) {
+
+	backupDkgResult, backupMetadata, err := backup(host, dkgResultStr, metadata, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return "", err
+	}
+
+	backupDkgResultStr, err := json.Marshal(backupDkgResult)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return "", err
+	}
+
+	res := make(map[string]string)
+	res["DkgResult"] = string(backupDkgResultStr)
+	res["Metadata"] = backupMetadata
+
+	respJSON, err := json.Marshal(res)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return "", err
+	}
+
+	return hex.EncodeToString(respJSON), err
+}
+
+func FromBackup(host, _backup, authData string) (*tss.DkgResult, string, error) {
+
+	backupBytes, err := hex.DecodeString(_backup)
+	if err != nil {
+		log.Println("error while Backup (hex decode):", err)
+		return nil, "", err
+	}
+
+	var backupDkgResult map[string]string
+	err = json.Unmarshal(backupBytes, &backupDkgResult)
+	if err != nil {
+		log.Println("error while Backup (json unmarshal):", err)
+		return nil, "", err
+	}
+
+	dkgResult, metadata, err := backup(host, backupDkgResult["DkgResult"], backupDkgResult["Metadata"], authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return nil, "", err
+	}
+
+	return dkgResult, metadata, nil
 }

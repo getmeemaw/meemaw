@@ -36,7 +36,7 @@ func main() {
 
 	dkgResultStr := string(dkgResultBytes)
 
-	dkgResultBackup, metadataBackup, err := client.Backup(host, dkgResultStr, metadataFirstClient, authData)
+	backup, err := client.Backup(host, dkgResultStr, metadataFirstClient, authData)
 	if err != nil {
 		log.Println("Error client.Backup:", err)
 		panic(err)
@@ -47,8 +47,7 @@ func main() {
 	log.Println("metadataFirstClient:", metadataFirstClient)
 
 	log.Println("")
-	log.Println("dkgResultBackup:", dkgResultBackup)
-	log.Println("metadataBackup:", metadataBackup)
+	log.Println("backup:", backup)
 
 	// // Multi-device
 	// dkgResultSecondClient, metadataSecondClient, err := AddDevice(host, authData, device, dkgResultFirstClient, metadataFirstClient)

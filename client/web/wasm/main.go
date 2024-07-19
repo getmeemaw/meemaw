@@ -135,24 +135,13 @@ func Backup(this js.Value, args []js.Value) (any, error) {
 	metadata := args[2].String()
 	authData := args[3].String()
 
-	dkgResult, metadata, err := client.Backup(host, dkgResultStr, metadata, authData)
+	backup, err := client.Backup(host, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while Backup:", err)
 		return nil, err
 	}
 
-	resp := dkgResponse{
-		DkgResult: dkgResult,
-		Metadata:  metadata,
-	}
-
-	respJSON, err := json.Marshal(resp)
-	if err != nil {
-		log.Println("error while marshaling dkgresult json:", err)
-		return nil, err
-	}
-
-	return hex.EncodeToString(respJSON), err
+	return backup, err
 }
 
 // input : host, backup, authData
@@ -162,26 +151,7 @@ func FromBackup(this js.Value, args []js.Value) (any, error) {
 	backup := args[1].String()
 	authData := args[2].String()
 
-	backupBytes, err := hex.DecodeString(backup)
-	if err != nil {
-		log.Println("error while Backup (hex decode):", err)
-		return nil, err
-	}
-
-	var backupDkgResult dkgResponse
-	err = json.Unmarshal(backupBytes, &backupDkgResult)
-	if err != nil {
-		log.Println("error while Backup (json unmarshal):", err)
-		return nil, err
-	}
-
-	backupDkgResultStr, err := json.Marshal(backupDkgResult.DkgResult) // not great, as it will be unmarshalled down the line again...
-	if err != nil {
-		log.Println("error while Backup (json marshal):", err)
-		return nil, err
-	}
-
-	dkgResult, metadata, err := client.Backup(host, string(backupDkgResultStr), backupDkgResult.Metadata, authData)
+	dkgResult, metadata, err := client.FromBackup(host, backup, authData)
 	if err != nil {
 		log.Println("error while Backup:", err)
 		return nil, err

@@ -2,6 +2,7 @@ package tsslib
 
 import (
 	"encoding/json"
+	"log"
 
 	"github.com/getmeemaw/meemaw/client"
 	"github.com/getmeemaw/meemaw/utils/tss"
@@ -55,17 +56,30 @@ func AcceptDevice(host string, dkgResultStr string, authData string) *SwiftResul
 }
 
 func Backup(host string, dkgResultStr string, authData string) *SwiftResultString {
-	// UPDATE
-	// ATTENTION : needs to be same format as web (and all platforms) => harmonize at client.go level ??
 
-	return nil
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	backup, err := client.Backup(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	return swiftResultString(backup, nil)
 }
 
 func FromBackup(host string, backup string, authData string) *SwiftResultString {
-	// UPDATE
-	// ATTENTION : needs to be same format as web (and all platforms) => harmonize at client.go level ??
 
-	return nil
+	dkgResult, metadata, err := client.FromBackup(host, backup, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return swiftResultDkg(nil, "", err)
+	}
+
+	return swiftResultDkg(dkgResult, metadata, nil)
 }
 
 func Sign(host string, message []byte, dkgResultStr string, authData string) *SwiftResultBytes {

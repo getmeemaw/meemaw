@@ -178,6 +178,20 @@ public struct Wallet: EthereumAccountProtocol {
 
         throw TssError.acceptError
     }
+
+    public func Backup() throws -> String {
+        let ret = TsslibBackup(self.server, self.wallet, self.auth)
+
+        if let backup = ret {
+            if backup.successful {
+                return backup.result
+            } else {
+                print(backup.error)
+            }
+        }
+
+        throw TssError.backupError
+    }
 }
 
 enum EthereumSignerError: Error {
@@ -193,6 +207,7 @@ enum TssError: Error {
     case acceptError
     case signError
     case recoverError
+    case backupError
 }
 
 public struct Meemaw {
@@ -272,6 +287,50 @@ public struct Meemaw {
         }
 
         // 3. Store
+        do {
+            try StoreWallet(dkgResult: dkgResult, userId: userId)
+        } catch {
+            print("Error while storing wallet")
+            throw error
+        }
+
+        return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
+    }
+
+    public func GetWalletFromBackup(auth: String, backup: String) async throws -> Wallet {
+        // Get userId from authData
+        let ret = TsslibIdentify(self._server, auth)
+        var userId = ""
+        
+        if let userIdRet = ret {
+            if userIdRet.successful {
+                userId = userIdRet.result
+            } else {
+                print("error when identify:")
+                print(userIdRet.error)
+                throw TssError.identifyError
+            }
+        }
+
+        if userId.isEmpty {
+            throw TssError.identifyError
+        }
+
+        // Create wallet based on backup
+        let backup = TsslibFromBackup(self._server, backup, auth)
+
+        var dkgResult = ""
+
+        if let dkg = backup {
+            if dkg.successful {
+                dkgResult = dkg.result
+            } else {
+                print(dkg.error)
+                throw TssError.backupError
+            }
+        }
+
+        // Store
         do {
             try StoreWallet(dkgResult: dkgResult, userId: userId)
         } catch {
