@@ -47,7 +47,7 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 		OriginPatterns: []string{u.Host + u.Path},
 	})
 	if err != nil {
-		log.Println("Error accepting websocket:", err)
+		log.Println("RegisterDeviceHandler - Error accepting websocket:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -372,7 +372,7 @@ func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request
 		OriginPatterns: []string{u.Host + u.Path},
 	})
 	if err != nil {
-		log.Println("Error accepting websocket:", err)
+		log.Println("AcceptDeviceHandler - Error accepting websocket:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}

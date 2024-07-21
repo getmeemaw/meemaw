@@ -73,8 +73,6 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	}
 	defer resp.Body.Close()
 
-	log.Println("lolilol")
-
 	_host, err := urlToWs(host)
 	if err != nil {
 		log.Println("error getting ws host:", err)

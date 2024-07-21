@@ -53,7 +53,7 @@ func (p *PeerManager) MustSend(peerID string, message interface{}) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	fmt.Println("Must send message to", peerID, ":", message)
+	// fmt.Println("Must send message to", peerID, ":", message)
 
 	p.outwardMessages = append(p.outwardMessages, Message{
 		PeerID:  peerID,
@@ -118,7 +118,7 @@ func (p *PeerManager) GetNextMessageToSendPeer(peerID string) (Message, error) {
 
 	for _, el := range p.outwardMessages {
 		if el.PeerID == peerID && len(nextMsg.PeerID) == 0 {
-			fmt.Println("GetNextMessageToSendPeer (", peerID, "):", el.Message)
+			// fmt.Println("GetNextMessageToSendPeer (", peerID, "):", el.Message)
 			nextMsg.PeerID = el.PeerID
 			msg, ok := el.Message.(proto.Message)
 			if !ok {

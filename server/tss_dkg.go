@@ -55,7 +55,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 		OriginPatterns: []string{u.Host + u.Path},
 	})
 	if err != nil {
-		log.Println("Error accepting websocket:", err)
+		log.Println("DkgHandler - Error accepting websocket:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
