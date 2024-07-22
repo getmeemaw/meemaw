@@ -30,20 +30,15 @@ During normal operations, the TSS process happens between the server and the dev
 
 **When a transaction needs to be signed (SIGN)**, the server confirms again with the Auth provider that the user is who he says he is. Then the server and the device work in concert through the TSS process to iteratively sign the transaction using their shares. Again, there is no "complete" wallet private key that ever appears on either side. The transaction ends up being fully signed and ready to be broadcast to the blockchain.
 
-Meemaw requires 2 signatures out of N shares to send funds. There will always be at least a server share and a client share. On top of that, the user can add other devices or generate a backup, which will create additional shares. Those shares can be used in different ways depending on the use case:
+Meemaw requires 2 signatures out of N shares to send funds. There will always be at least a server share and a client share. On top of that, the user can [add other devices or generate a backup](/docs/multi-device), which will create additional shares. Those shares can be used in different ways depending on the use case:
 
 ## Other flows
 
-### Add device (to be implemented)
-Meemaw will allow you to add additional devices. Read further to understand why this is useful. In order to add devices, the user will need to have access to all existing shares, so that new shares can be generated.
+### Add device
+Meemaw allows you to add additional devices. This creates redundancy. If the user looses access to one device, he can use another one. Similarly, if the server looses all its data, the user can recover his wallet based on two devices. [Read more](/docs/multi-device)
 
-### Backup (to be implemented)
-Another way to add shares will be to download a backup file. This would allow the user to recover funds based on that backup file and the server share, even if the user looses access to all his devices.
-
-### No server (to be implemented)
-When the user wants to use funds without going through the server, he will have the possibility of signing transactions using two client shares, for example using two different devices. This allows for clients' funds not to be blocked by the server, ever. 
-
-Note: we will open source a small utility that will help with the process outside of a given Meemaw deployment. This will allow anyone to recover their funds if a company goes rogue, gets hacked, gets bankrupt, etc.
+### Backup
+Another way to add shares is to download a backup file. This allows the user to recover his wallet based on that backup file and the server share, even if the user looses access to all his devices. If the server looses all its data, the user can recover his wallet based on the backup file and another device. [Read more](/docs/multi-device)
 
 ## Technical implementation
 

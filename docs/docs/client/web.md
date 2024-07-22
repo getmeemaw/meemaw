@@ -119,18 +119,57 @@ const signature = await wallet.SignBytes(message);
 
 Note that this just signs arbitrary bytes, it does not comply with Ethereum specifics standards. You probably want to check [eip-191](https://eips.ethereum.org/EIPS/eip-191) and [eip-712](https://eips.ethereum.org/EIPS/eip-712). We will probably add some helpers in the future, similarly to our iOS SDK.
 
+### Multi-device
+
+Before you start using it, it's probably important you learn [how multi-device works](/docs/multi-device).
+
+Multi-device works in two steps: 
+1. starting registration on a new device
+2. accepting on an existing device.
+
+#### Register device
+
+You actually don't have to do anything. The function we used above (`meemaw.GetWallet(...)`) automatically recognizes that it's a new device when a wallet already exists.
+
+However, we recommend that you provide two callback functions: one called when the function starts the registration process, and one called when the process is finished. This allows you to display a call to action in the UI, prompting the user to use his other device to confirm.
+
+Here is how you would adapt the code above:
+
+```javascript
+import Meemaw from 'meemaw-js'
+
+const meemaw = await Meemaw.init('MEEMAW_SERVER');
+const wallet = await meemaw.GetWallet(TOKEN, function() {
+            // RegisterDevice started => prompt user for confirmation on existing device
+        }, function() {
+            // RegisterDevice done => hide prompt
+        });
+```
+
+This will recover the wallet if it already exists on the device, create a new one if the user doesn't have one at all, or start the multi-device process if the user already has a wallet created on another device.
+
+#### Accept device
+
+On the existing device, it is now time to confirm the new device with a simple call:
+
+```javascript
+await wallet.AcceptDevice()
+```
+
+That's it, now the multi-device process will happen with both devices and the server communicating with each other. At the end of the process, the new device will have it's own part of the overall MPC wallet, ready for operations.
+
 ### Export private key
 
 You can offer your users to export their private key:
 
 ```javascript
-const privateKey = await wallet.Recover();
+const privateKey = await wallet.Export();
 ```
 
 This is useful if your users want to manage their wallet outside of your platform, for example.
 
 :::warning
-Meemaw wallets are MPC wallets. Until you decide otherwise, **no private key exists**, transactions are signed during a collaboration process between the server and the client.
+Meemaw wallets are MPC wallets. Until you decide otherwise, **no private key exists**, transactions are signed through a collaboration process between the server and the client.
 
 However, **it is possible to generate the private key corresponding to the wallet**. The way it works is the following: the client sends its TSS share to the server, which then combines the client share with its own share to form a private key.
 
