@@ -218,7 +218,7 @@ public struct Meemaw {
     }
     
     // GetWallet returns the wallet if it exists or creates a new one
-    public func GetWallet(auth: String, callbackRegisterStarted: ((String) -> Void)? = nil, callbackRegisterDone: ((String) -> Void)? = nil) async throws -> Wallet {
+    public func GetWallet(auth: String, callbackRegisterStarted: ((String?) -> Void)? = nil, callbackRegisterDone: ((String?) -> Void)? = nil) async throws -> Wallet {
         
         var dkgResult = ""
         
@@ -268,7 +268,8 @@ public struct Meemaw {
         if walletExistsServer {
             do {
                 if let callbackRegisterStarted = callbackRegisterStarted {
-                    callbackRegisterStarted("devicecode")
+                    // callbackRegisterStarted("devicecode")
+                    callbackRegisterStarted()
                 } else {
                     print("register device started, but no callback function provided")
                 }
@@ -276,7 +277,8 @@ public struct Meemaw {
                 dkgResult = try registerDevice(auth: auth)
 
                 if let callbackRegisterDone = callbackRegisterDone {
-                    callbackRegisterDone("devicecode")
+                    // callbackRegisterDone("devicecode")
+                    callbackRegisterDone()
                 } else {
                     print("register device is done, but no callback function provided")
                 }
