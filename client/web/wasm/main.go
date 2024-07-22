@@ -33,7 +33,7 @@ func main() {
 	js.Global().Set("SignBytes", asyncFunc(SignBytes))
 	// js.Global().Set("SignEthMessage", asyncFunc(SignEthMessage))
 	js.Global().Set("SignEthTransaction", asyncFunc(SignEthTransaction))
-	js.Global().Set("Recover", asyncFunc(Recover))
+	js.Global().Set("Export", asyncFunc(Export))
 
 	select {}
 }
@@ -200,13 +200,13 @@ func SignBytes(this js.Value, args []js.Value) (any, error) {
 
 // input : host, dkgResultStr, authData
 // output : privateKey, error
-func Recover(this js.Value, args []js.Value) (any, error) {
+func Export(this js.Value, args []js.Value) (any, error) {
 	host := args[0].String()
 	dkgResultStr := args[1].String()
 	metadata := args[2].String()
 	authData := args[3].String()
 
-	privateKey, err := client.Recover(host, dkgResultStr, metadata, authData)
+	privateKey, err := client.Export(host, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while signing:", err)
 		return nil, err

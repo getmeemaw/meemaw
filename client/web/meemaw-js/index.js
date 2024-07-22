@@ -54,15 +54,15 @@ export class Wallet {
         return "0x"+signature;
     }
 
-    // Recover recovers the private key based on client and server shares
-    async Recover() {
+    // Export exports the private key based on client and server shares
+    async Export() {
 
         let privateKey = ""
 
         try {
-            privateKey = await window.Recover(this.host, this.dkgResult, this.metadata, this.authData);
+            privateKey = await window.Export(this.host, this.dkgResult, this.metadata, this.authData);
         } catch (error) {
-            console.log("error while recovering private key:", error)
+            console.log("error while exporting private key:", error)
             throw error;
         }
 

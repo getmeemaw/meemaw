@@ -151,8 +151,8 @@ public struct Wallet: EthereumAccountProtocol {
         return SignedTransaction(transaction: transaction, signature: signature)
     }
 
-    public func Recover() throws -> String {
-        let ret = TsslibRecover(self.server, self.wallet, self.auth)
+    public func Export() throws -> String {
+        let ret = TsslibExport(self.server, self.wallet, self.auth)
 
         if let privateKey = ret {
             if privateKey.successful {
@@ -162,7 +162,7 @@ public struct Wallet: EthereumAccountProtocol {
             }
         }
 
-        throw TssError.recoverError
+        throw TssError.exportError
     }
 
     public func AcceptDevice() throws -> Void {
@@ -206,7 +206,7 @@ enum TssError: Error {
     case registerError
     case acceptError
     case signError
-    case recoverError
+    case exportError
     case backupError
 }
 

@@ -357,9 +357,9 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	return signature, nil
 }
 
-// Recover recovers the private key from the server and client shares
+// Export exports the private key from the server and client shares
 // Requires the dkgResult (i.e. client-side of wallet), authData (to confirm authorization and identify user) and host
-func Recover(host string, dkgResultStr string, metadata string, authData string) (string, error) {
+func Export(host string, dkgResultStr string, metadata string, authData string) (string, error) {
 
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
@@ -369,7 +369,7 @@ func Recover(host string, dkgResultStr string, metadata string, authData string)
 	}
 
 	// Prepare query
-	path := "/recover?token=" + token
+	path := "/export?token=" + token
 
 	_host, err := urlToHttp(host)
 	if err != nil {

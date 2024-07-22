@@ -86,7 +86,7 @@ func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Se
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
 
 	// export private key
-	r.With(server.authMiddleware).Post("/recover", server.RecoverHandler)
+	r.With(server.authMiddleware).Post("/export", server.ExportHandler)
 
 	// multi-device
 	r.With(server.authMiddleware).Get("/register", server.RegisterDeviceHandler)

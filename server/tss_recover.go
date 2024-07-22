@@ -11,10 +11,10 @@ import (
 	"github.com/getmeemaw/meemaw/utils/types"
 )
 
-// RecoverHandler recovers the private key from the server and client shares
+// ExportHandler exports the private key from the server and client shares
 // goes through the authMiddleware to confirm the access token and get the userId
 // requires the client share (provided in URL parameter)
-func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
+func (server *Server) ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Verify POST request
 	if r.Method != http.MethodPost {
@@ -65,7 +65,7 @@ func (server *Server) RecoverHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Recover private key
+	// Export private key
 	privateKey, err := tss.RecoverPrivateKeyWrapper(clientPeerID, dkgResult.Pubkey, dkgResult.Share, clientShareStr, dkgResult.BKs)
 	if err != nil {
 		log.Println("Error recovering private key:", err)
