@@ -22,9 +22,9 @@ let package = Package(
             dependencies: [.target(name: "Tsslib"), "web3.swift"]),
         .binaryTarget(
             name: "Tsslib",
-            // url: "https://github.com/getmeemaw/meemaw/releases/download/v0.1.1/Tsslib.xcframework.zip",
-            // checksum: "b81a5a32d83403b125bdc4f6a0dbc53f2ba32eb26d1fc56f32eb147cae0a8d41"
-            path: "Tsslib.xcframework"
+            url: "https://github.com/getmeemaw/meemaw/releases/download/v1.2.0/Tsslib.xcframework.zip",
+            checksum: "0295c9719995037ebb2a91c7e2cac3d64d9051ff4d73caae2b2730655a3bef6c"
+            // path: "Tsslib.xcframework" // dev
         )
     ]
 )

@@ -268,8 +268,8 @@ public struct Meemaw {
         if walletExistsServer {
             do {
                 if let callbackRegisterStarted = callbackRegisterStarted {
-                    // callbackRegisterStarted("devicecode")
-                    callbackRegisterStarted()
+                    callbackRegisterStarted("devicecode")
+                    // callbackRegisterStarted()
                 } else {
                     print("register device started, but no callback function provided")
                 }
@@ -277,8 +277,8 @@ public struct Meemaw {
                 dkgResult = try registerDevice(auth: auth)
 
                 if let callbackRegisterDone = callbackRegisterDone {
-                    // callbackRegisterDone("devicecode")
-                    callbackRegisterDone()
+                    callbackRegisterDone("devicecode")
+                    // callbackRegisterDone()
                 } else {
                     print("register device is done, but no callback function provided")
                 }
