@@ -20,7 +20,7 @@ Even though the process in itself is complex, Meemaw abstracts everything away. 
 1. ***meemaw.GetWallet()***: remember how you called *meemaw.GetWallet()* [during the getting-started](/docs/getting-started)? Well, this function also initiates the multi-device process if Meemaw recognizes this as a new device when a wallet already exists.
 2. ***wallet.AcceptDevice()***: once the multi-device process is initiated on the new device, it's just a matter of using *wallet.AcceptDevice()* on a device that is already registered.
 
-That's it! If you want to start using it (and learn more about callback functions, etc), head to [our SDK section](/docs/client/).
+That's it! Start now by checking [our SDK section](/docs/client/) and learn more about callback functions and more.
 
 ## Backup file
 
