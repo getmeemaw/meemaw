@@ -24,7 +24,7 @@ That's it! Start now by checking [our SDK section](/docs/client/) and learn more
 
 ## Backup file
 
-You can also generate a backup file for your users. Behind the scenes, it uses multi-device to create a new fully-functional share. This means that it can be used if the user looses his devices, or if the server looses his shares.
+You can also generate a backup file for your users. Behind the scenes, it uses multi-device to create a new fully-functional share. This means that it can be used if the user loses his devices, or if the server loses his shares.
 
 You just need to call *wallet.Backup()* to generate a long string, i.e. the backup. You're free to package it as a file or print it on the page, depending on the experience you want to provide.
 

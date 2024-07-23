@@ -35,10 +35,10 @@ Meemaw requires 2 signatures out of N shares to send funds. There will always be
 ## Other flows
 
 ### Add device
-Meemaw allows you to add additional devices. This creates redundancy. If the user looses access to one device, he can use another one. Similarly, if the server looses all its data, the user can recover his wallet based on two devices. [Read more](/docs/multi-device)
+Meemaw allows you to add additional devices. This creates redundancy. If the user loses access to one device, he can use another one. Similarly, if the server loses all its data, the user can recover his wallet based on two devices. [Read more](/docs/multi-device)
 
 ### Backup
-Another way to add shares is to download a backup file. This allows the user to recover his wallet based on that backup file and the server share, even if the user looses access to all his devices. If the server looses all its data, the user can recover his wallet based on the backup file and another device. [Read more](/docs/multi-device)
+Another way to add shares is to download a backup file. This allows the user to recover his wallet based on that backup file and the server share, even if the user loses access to all his devices. If the server loses all its data, the user can recover his wallet based on the backup file and another device. [Read more](/docs/multi-device)
 
 ## Technical implementation
 
