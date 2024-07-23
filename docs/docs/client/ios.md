@@ -93,3 +93,66 @@ Our iOS SDK also provides a way to sign arbitrary bytes:
 ```swift
 let signature = try wallet.SignBytes(message: Data)
 ```
+
+### Multi-device
+
+Before you start using it, it's probably important you learn [how multi-device works](/docs/multi-device).
+
+Multi-device works in two steps: 
+1. starting registration on a new device
+2. accepting on an existing device.
+
+#### Register device
+
+You actually don't have to do anything. The function we used above (`meemaw.GetWallet(...)`) automatically recognizes that it's a new device when a wallet already exists.
+
+However, we recommend that you provide two callback functions: one called when the function starts the registration process, and one called when the process is finished. This allows you to display a call to action in the UI, prompting the user to use his other device to confirm.
+
+Here is how you would adapt the code above:
+
+```swift
+import meemaw
+import web3
+
+let meemaw = Meemaw(server: "meemaw-url")
+let wallet = try await meemaw.GetWallet(
+    auth: TOKEN, 
+    callbackRegisterStarted: {
+        // RegisterDevice started => prompt user for confirmation on existing device
+    },
+    callbackRegisterDone: {
+        // RegisterDevice done => hide prompt
+    })
+```
+
+This will recover the wallet if it already exists on the device, create a new one if the user doesn't have one at all, or start the multi-device process if the user already has a wallet created on another device.
+
+#### Accept device
+
+On the existing device, it is now time to confirm the new device with a simple call:
+
+```javascript
+await wallet.AcceptDevice()
+```
+
+That's it, now the multi-device process will happen with both devices and the server communicating with each other. At the end of the process, the new device will have it's own part of the overall MPC wallet, ready for operations.
+
+### Export private key
+
+You can offer your users to export their private key:
+
+```swift
+let privateKey = try wallet.Export()
+```
+
+This is useful if your users want to manage their wallet outside of your platform, for example.
+
+:::warning
+Meemaw wallets are MPC wallets. Until you decide otherwise, **no private key exists**, transactions are signed through a collaboration process between the server and the client.
+
+However, **it is possible to generate the private key corresponding to the wallet**. The way it works is the following: the client sends its TSS share to the server, which then combines the client share with its own share to form a private key.
+
+It is important to understand that by doing so, **you completely loose the security and decentralization benefits of MPC wallets**: anyone with access to this private key can spend the funds contained in the wallet.
+
+It is also important to note that **the MPC wallet still exist**, it's just that the private key now exists as well and can bypass the whole TSS process.
+:::

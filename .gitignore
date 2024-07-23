@@ -4,12 +4,6 @@ go.sum
 tss-go
 client/client
 server/server
-client/ios/meemaw-ios/Sources/Tsslib.xcframework/*
-/client/ios/meemaw-ios/Tsslib.xcframework
-client/ios/meemaw-ios/.build/*
-client/ios/meemaw-ios/Tsslib.xcframework.zip
-client/ios/meemaw-ios/.swiftpm/*
-client/ios/meemaw-ios/Package.resolved
 client/ios/test/test/test/*
 client/ios/test/test/test.xcodeproj/*
 !client/ios/test/test/test/ContentView.swift
@@ -21,6 +15,9 @@ client/web/client.html.backup
 config.custom.toml
 config.toml
 config.bck.toml
-meemaw
 !client/ios/meemaw-ios/Sources/meemaw
 server/cmd/meemaw.wasm
+test/integration/temp/temp
+/client/ios/meemaw/.build
+client/ios/meemaw/Tsslib.xcframework.zip
+/client/ios/meemaw/Tsslib.xcframework

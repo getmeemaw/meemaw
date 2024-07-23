@@ -2,6 +2,7 @@ package tsslib
 
 import (
 	"encoding/json"
+	"log"
 
 	"github.com/getmeemaw/meemaw/client"
 	"github.com/getmeemaw/meemaw/utils/tss"
@@ -22,22 +23,99 @@ func Identify(host string, authData string) *SwiftResultString {
 }
 
 func Dkg(host string, authData string) *SwiftResultString {
-	dkgResult, _, err := client.Dkg(host, authData) // update to return and store metadata
+	dkgResult, metadata, err := client.Dkg(host, authData)
 	if err != nil {
-		swiftResultDkg(nil, err)
+		return swiftResultDkg(nil, "", err)
 	}
-	return swiftResultDkg(dkgResult, nil)
+	return swiftResultDkg(dkgResult, metadata, nil)
+}
+
+func RegisterDevice(host string, authData string) *SwiftResultString {
+
+	dkgResult, metadata, err := client.RegisterDevice(host, authData, "ios")
+	if err != nil {
+		return swiftResultDkg(nil, "", err)
+	}
+
+	return swiftResultDkg(dkgResult, metadata, nil)
+}
+
+func AcceptDevice(host string, dkgResultStr string, authData string) *SwiftResultString {
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	err = client.AcceptDevice(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	return swiftResultString("", nil)
+}
+
+func Backup(host string, dkgResultStr string, authData string) *SwiftResultString {
+
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	backup, err := client.Backup(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	return swiftResultString(backup, nil)
+}
+
+func FromBackup(host string, backup string, authData string) *SwiftResultString {
+
+	dkgResult, metadata, err := client.FromBackup(host, backup, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return swiftResultDkg(nil, "", err)
+	}
+
+	return swiftResultDkg(dkgResult, metadata, nil)
 }
 
 func Sign(host string, message []byte, dkgResultStr string, authData string) *SwiftResultBytes {
-	signature, err := client.Sign(host, message, dkgResultStr, "", authData)
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
 	if err != nil {
-		swiftResultSignature(nil, err)
+		return swiftResultSignature(nil, err)
+	}
+
+	signature, err := client.Sign(host, message, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultSignature(nil, err)
 	}
 	return swiftResultSignature(signature, nil)
 }
 
-func swiftResultDkg(res *tss.DkgResult, err error) *SwiftResultString {
+func Export(host string, dkgResultStr string, authData string) *SwiftResultString {
+	var upgradedDkgResult upgradedDkgResult
+	err := json.Unmarshal([]byte(dkgResultStr), &upgradedDkgResult)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+
+	privateKey, err := client.Export(host, upgradedDkgResult.DkgResultStr, upgradedDkgResult.Metadata, authData)
+	if err != nil {
+		return swiftResultString("", err)
+	}
+	return swiftResultString(privateKey, nil)
+}
+
+type upgradedDkgResult struct {
+	DkgResultStr string
+	Metadata     string
+}
+
+func swiftResultDkg(dkgResult *tss.DkgResult, metadata string, err error) *SwiftResultString {
 	if err != nil {
 		return &SwiftResultString{
 			Successful: false,
@@ -45,6 +123,20 @@ func swiftResultDkg(res *tss.DkgResult, err error) *SwiftResultString {
 			Error:      err.Error(),
 		}
 	} else {
+		dkgResultStr, err := json.Marshal(dkgResult)
+		if err != nil {
+			return &SwiftResultString{
+				Successful: false,
+				Result:     "",
+				Error:      err.Error(),
+			}
+		}
+
+		res := upgradedDkgResult{
+			DkgResultStr: string(dkgResultStr),
+			Metadata:     metadata,
+		}
+
 		ret, err := json.Marshal(res)
 		if err != nil {
 			return &SwiftResultString{
@@ -52,13 +144,14 @@ func swiftResultDkg(res *tss.DkgResult, err error) *SwiftResultString {
 				Result:     "",
 				Error:      err.Error(),
 			}
-		} else {
-			return &SwiftResultString{
-				Successful: true,
-				Result:     string(ret),
-				Error:      "",
-			}
 		}
+
+		return &SwiftResultString{
+			Successful: true,
+			Result:     string(ret),
+			Error:      "",
+		}
+
 	}
 }
 

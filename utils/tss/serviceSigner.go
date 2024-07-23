@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/getamis/alice/crypto/birkhoffinterpolation"
-	elliptic "github.com/getamis/alice/crypto/elliptic"
 	"github.com/getamis/alice/crypto/homo/paillier"
 	"github.com/getamis/alice/crypto/tss/dkg"
 	"github.com/getamis/alice/crypto/tss/ecdsa/gg18/signer"
@@ -21,20 +20,18 @@ type serviceSigner struct {
 	share   string
 	BKs     map[string]BK
 	message []byte
-	curve   elliptic.Curve
 	done    chan struct{}
 	result  *signer.Result
 	err     error
 }
 
-func NewServiceSigner(pubkey *Pubkey, share string, BKs map[string]BK, message []byte, curve elliptic.Curve) *serviceSigner {
+func NewServiceSigner(pubkey *Pubkey, share string, BKs map[string]BK, message []byte) *serviceSigner {
 	s := &serviceSigner{
 		// pm:   pm,
 		pubkey:  pubkey,
 		share:   share,
 		BKs:     BKs,
 		message: message,
-		curve:   curve,
 		done:    make(chan struct{}),
 	}
 
@@ -47,7 +44,7 @@ var (
 )
 
 // ConvertDKGResult converts DKG result from config.
-func ConvertDKGResult(k *Pubkey, cfgShare string, cfgBKs map[string]BK, curve elliptic.Curve) (*dkg.Result, error) {
+func ConvertDKGResult(k *Pubkey, cfgShare string, cfgBKs map[string]BK) (*dkg.Result, error) {
 	// Build public key.
 	// x, ok := new(big.Int).SetString(cfgPubkey.X, 10)
 	// if !ok {
@@ -95,7 +92,7 @@ func (p *serviceSigner) Init(pm *PeerManager) error {
 	p.pm = pm
 
 	// Signer needs results from DKG.
-	dkgResult, err := ConvertDKGResult(p.pubkey, p.share, p.BKs, p.curve)
+	dkgResult, err := ConvertDKGResult(p.pubkey, p.share, p.BKs)
 	if err != nil {
 		log.Println("Cannot get DKG result", "err", err)
 		return err
@@ -135,17 +132,40 @@ func (p *serviceSigner) Process() {
 	<-p.done
 }
 
+func (service *serviceSigner) PostProcess() (*Signature, error) {
+	publicKeyECDSA := service.pubkey.GetECDSA()
+
+	newR, newS, err := secp256k1SignatureToLowS(publicKeyECDSA, service.result.R, service.result.S)
+	if err != nil {
+		log.Println("error SignatureToLowS:", err)
+		return nil, err
+	}
+
+	signature, err := GenerateSignature(newR, newS, service.pubkey, service.message)
+	if err != nil {
+		log.Println("error generating signature:", err)
+		return nil, err
+	}
+
+	sig := Signature{
+		R:         newR,
+		S:         newS,
+		Signature: signature,
+	}
+
+	return &sig, nil
+}
+
 func (p *serviceSigner) OnStateChanged(oldState types.MainState, newState types.MainState) {
+
+	// log.Println("serviceSigner - State changed", "old", oldState.String(), "new", newState.String())
+
 	if newState == types.StateFailed {
 		log.Println("Signing failed", "old", oldState.String(), "new", newState.String())
 		p.err = fmt.Errorf("signing failed")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {
-		// ATTENTION : concurrency problem => once either client or server has finished, he will close the connexion which might kill the last necessary message for the other one
-		// => for now, implemented 1sec delay before closing so that everything can finish correctly
-
-		// log.Println("Signing done", "old", oldState.String(), "new", newState.String())
 		result, err := p.signer.GetResult()
 		if err == nil {
 			p.result = result
@@ -156,6 +176,4 @@ func (p *serviceSigner) OnStateChanged(oldState types.MainState, newState types.
 		close(p.done)
 		return
 	}
-
-	// log.Println("State changed", "old", oldState.String(), "new", newState.String())
 }

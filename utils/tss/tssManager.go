@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/getamis/alice/crypto/birkhoffinterpolation"
 	"github.com/getamis/alice/crypto/ecpointgrouplaw"
 	elliptic_alice "github.com/getamis/alice/crypto/elliptic"
 	"github.com/getamis/alice/crypto/tss/dkg"
@@ -27,6 +28,15 @@ import (
 
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 )
+
+const _rank uint32 = 0
+const _threshold uint32 = 2
+
+const _serverID = "server"
+
+// const _clientID = "client"
+// const AddExistingClientID = "client"
+// const AddNewClientID = "new-client"
 
 type GenericTSS interface {
 	// Process() (*Signature, error)
@@ -54,6 +64,51 @@ type BK struct {
 type SigningParameters struct {
 	Pubkey PubkeyStr
 	BKs    map[string]BK
+}
+
+type DkgResult struct {
+	Pubkey  PubkeyStr
+	BKs     map[string]BK
+	Share   string
+	Address string
+	PeerID  string
+}
+
+type ProcessResult struct {
+	PublicKey *ecpointgrouplaw.ECPoint
+	Share     *big.Int
+	Bks       map[string]*birkhoffinterpolation.BkParameter
+	PeerID    string
+}
+
+func PostProcessResult(result ProcessResult) (*DkgResult, error) {
+	pubkey := Pubkey{
+		X: result.PublicKey.GetX(),
+		Y: result.PublicKey.GetY(),
+	}
+	share := result.Share.String()
+	BKs := make(map[string]BK)
+
+	addr := pubkey.GetAddress().Hex()
+	pubkeyStr := pubkey.GetStr()
+
+	// Build bks.
+	for peerID, bk := range result.Bks {
+		BKs[peerID] = BK{
+			X:    bk.GetX().String(),
+			Rank: bk.GetRank(),
+		}
+	}
+
+	dkgResult := DkgResult{
+		Pubkey:  pubkeyStr,
+		BKs:     BKs,
+		Share:   share,
+		Address: addr,
+		PeerID:  result.PeerID,
+	}
+
+	return &dkgResult, nil
 }
 
 func NewPubkey(k PubkeyStr) (*Pubkey, error) {
@@ -102,23 +157,44 @@ func (k *Pubkey) GetECPoint() (*ecpointgrouplaw.ECPoint, error) {
 /// DKG ///
 ///////////
 
-type DkgResult struct {
-	Pubkey  PubkeyStr
-	BKs     map[string]BK
-	Share   string
-	Address string
-}
+func MergeDkgResults(first, second *DkgResult) (*DkgResult, bool) {
+	if first.Address != second.Address || first.PeerID != second.PeerID || first.Share != second.Share || first.Pubkey.X != second.Pubkey.X || first.Pubkey.Y != second.Pubkey.Y {
+		return nil, false
+	}
 
-type ServerDkg struct {
-	service *serviceDkg
+	mergedBKs := make(map[string]BK)
+
+	for key, value := range first.BKs {
+		mergedBKs[key] = value
+	}
+
+	for key, value := range second.BKs {
+		mergedBKs[key] = value
+	}
+
+	ret := &DkgResult{
+		Pubkey:  first.Pubkey,
+		Share:   first.Share,
+		Address: first.Address,
+		PeerID:  first.PeerID,
+		BKs:     mergedBKs,
+	}
+
+	return ret, true
 }
 
 // Server
-func NewServerDkg() (*ServerDkg, error) {
-	service := NewServiceDkg(2, 0, elliptic_alice.Secp256k1())
 
-	pm := NewPeerManager("server")
-	pm.AddPeer("client")
+type ServerDkg struct {
+	service      *serviceDkg
+	clientPeerID string
+}
+
+func NewServerDkg(clientPeerID string) (*ServerDkg, error) {
+	service := NewServiceDkg(_threshold, _rank, elliptic_alice.Secp256k1())
+
+	pm := NewPeerManager(_serverID)
+	pm.AddPeer(clientPeerID)
 
 	err := service.Init(pm)
 	if err != nil {
@@ -130,50 +206,56 @@ func NewServerDkg() (*ServerDkg, error) {
 		return service.Handle(msg)
 	})
 
-	return &ServerDkg{service: service}, nil
+	return &ServerDkg{service: service, clientPeerID: clientPeerID}, nil
 }
 
 func (p *ServerDkg) Process() (*DkgResult, error) {
 	p.service.Process()
 
 	if p.service.result == nil {
-		return nil, fmt.Errorf("could not get server dkg results")
+		return nil, fmt.Errorf("could not get ServerDkg dkg results")
 	}
 
-	pubkey := Pubkey{
-		X: p.service.result.PublicKey.GetX(),
-		Y: p.service.result.PublicKey.GetY(),
-	}
-	share := p.service.result.Share.String()
-	BKs := make(map[string]BK)
-
-	addr := pubkey.GetAddress().Hex()
-	pubkeyStr := pubkey.GetStr()
-
-	// Build bks.
-	for peerID, bk := range p.service.result.Bks {
-		BKs[peerID] = BK{
-			X:    bk.GetX().String(),
-			Rank: bk.GetRank(),
-		}
+	res := ProcessResult{
+		PublicKey: p.service.result.PublicKey,
+		Share:     p.service.result.Share,
+		Bks:       p.service.result.Bks,
+		PeerID:    p.clientPeerID,
 	}
 
-	dkgResult := DkgResult{
-		Pubkey:  pubkeyStr,
-		BKs:     BKs,
-		Share:   share,
-		Address: addr,
-	}
-
-	return &dkgResult, nil
+	return PostProcessResult(res)
 }
 
-func (p *ServerDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("client")
+func (p *ServerDkg) GetNextMessageToSend() (Message, error) {
+	return p.service.pm.GetNextMessageToSendPeer(p.clientPeerID)
 }
 
-func (p *ServerDkg) HandleMessage(msg types.Message) error {
-	return p.service.pm.HandleMessage(msg)
+func (p *ServerDkg) HandleMessage(msg *Message) error {
+	// return p.service.pm.HandleMessage(msg)
+
+	// log.Println("HandleMessage server")
+
+	msgStr, ok := msg.Message.(string)
+	if !ok {
+		log.Println("msg was not a string")
+		return errors.New("msg was not a string")
+	}
+	byteString, err := hex.DecodeString(msgStr)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return err
+	}
+	dkgMsg := &dkg.Message{}
+	err = proto.Unmarshal(byteString, dkgMsg)
+	// err = json.Unmarshal(byteString, addMsg)
+	if err != nil {
+		log.Println("ClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
+		return err
+	}
+
+	return p.service.pm.HandleMessage(dkgMsg)
+
+	// return p.service.pm.HandleMessage(msg)
 }
 
 func (p *ServerDkg) DkgOrSign() int {
@@ -182,15 +264,15 @@ func (p *ServerDkg) DkgOrSign() int {
 
 // Client
 type ClientDkg struct {
-	service *serviceDkg
+	service      *serviceDkg
+	clientPeerID string
 }
 
-// Server
-func NewClientDkg() (*ClientDkg, error) {
-	service := NewServiceDkg(2, 0, elliptic_alice.Secp256k1())
+func NewClientDkg(clientPeerID string) (*ClientDkg, error) {
+	service := NewServiceDkg(_threshold, _rank, elliptic_alice.Secp256k1())
 
-	pm := NewPeerManager("client")
-	pm.AddPeer("server")
+	pm := NewPeerManager(clientPeerID)
+	pm.AddPeer(_serverID)
 
 	err := service.Init(pm)
 	if err != nil {
@@ -202,7 +284,7 @@ func NewClientDkg() (*ClientDkg, error) {
 		return service.Handle(msg)
 	})
 
-	return &ClientDkg{service: service}, nil
+	return &ClientDkg{service: service, clientPeerID: clientPeerID}, nil
 }
 
 func (p *ClientDkg) Process() (*DkgResult, error) {
@@ -212,40 +294,44 @@ func (p *ClientDkg) Process() (*DkgResult, error) {
 		return nil, fmt.Errorf("could not get client dkg results")
 	}
 
-	pubkey := Pubkey{
-		X: p.service.result.PublicKey.GetX(),
-		Y: p.service.result.PublicKey.GetY(),
-	}
-	share := p.service.result.Share.String()
-	BKs := make(map[string]BK)
-
-	addr := pubkey.GetAddress().Hex()
-	pubkeyStr := pubkey.GetStr()
-
-	// Build bks.
-	for peerID, bk := range p.service.result.Bks {
-		BKs[peerID] = BK{
-			X:    bk.GetX().String(),
-			Rank: bk.GetRank(),
-		}
+	res := ProcessResult{
+		PublicKey: p.service.result.PublicKey,
+		Share:     p.service.result.Share,
+		Bks:       p.service.result.Bks,
+		PeerID:    p.clientPeerID,
 	}
 
-	dkgResult := DkgResult{
-		Pubkey:  pubkeyStr,
-		BKs:     BKs,
-		Share:   share,
-		Address: addr,
-	}
-
-	return &dkgResult, nil
+	return PostProcessResult(res)
 }
 
-func (p *ClientDkg) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("server")
+func (p *ClientDkg) GetNextMessageToSend() (Message, error) {
+	return p.service.pm.GetNextMessageToSendPeer(_serverID)
 }
 
-func (p *ClientDkg) HandleMessage(msg types.Message) error {
-	return p.service.pm.HandleMessage(msg)
+func (p *ClientDkg) HandleMessage(msg *Message) error {
+	// return p.service.pm.HandleMessage(msg)
+
+	// log.Println("HandleMessage server")
+
+	msgStr, ok := msg.Message.(string)
+	if !ok {
+		log.Println("msg was not a string")
+		return errors.New("msg was not a string")
+	}
+	byteString, err := hex.DecodeString(msgStr)
+	if err != nil {
+		log.Println("error decoding hex:", err)
+		return err
+	}
+	dkgMsg := &dkg.Message{}
+	err = proto.Unmarshal(byteString, dkgMsg)
+	// err = json.Unmarshal(byteString, addMsg)
+	if err != nil {
+		log.Println("ClientAdd.HandleMessage: could not proto unmarshal tss message to addshare.Message")
+		return err
+	}
+
+	return p.service.pm.HandleMessage(dkgMsg)
 }
 
 func (p *ClientDkg) DkgOrSign() int {
@@ -270,23 +356,29 @@ type Signature struct {
 
 // Server
 type ServerSigner struct {
-	service *serviceSigner
+	service      *serviceSigner
+	clientPeerID string
 }
 
-func NewServerSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ServerSigner, error) {
+func NewServerSigner(clientPeerID string, pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ServerSigner, error) {
 	// will probably need a wrapper with JSON input
-
-	curve := elliptic_alice.Secp256k1()
 
 	pubkey, err := NewPubkey(pubkeyStr)
 	if err != nil {
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message, curve)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == clientPeerID {
+			newBKs[key] = value
+		}
+	}
 
-	pm := NewPeerManager("server")
-	pm.AddPeer("client")
+	service := NewServiceSigner(pubkey, share, newBKs, message)
+
+	pm := NewPeerManager(_serverID)
+	pm.AddPeer(clientPeerID)
 
 	err = service.Init(pm)
 	if err != nil {
@@ -299,7 +391,7 @@ func NewServerSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, messa
 		return service.Handle(msg)
 	})
 
-	return &ServerSigner{service: service}, nil
+	return &ServerSigner{service: service, clientPeerID: clientPeerID}, nil
 }
 
 func (p *ServerSigner) Process() (*Signature, error) {
@@ -309,31 +401,11 @@ func (p *ServerSigner) Process() (*Signature, error) {
 		return nil, fmt.Errorf("could not get server signer results")
 	}
 
-	publicKeyECDSA := p.service.pubkey.GetECDSA()
-
-	newR, newS, err := secp256k1SignatureToLowS(publicKeyECDSA, p.service.result.R, p.service.result.S)
-	if err != nil {
-		log.Println("error SignatureToLowS:", err)
-		return nil, err
-	}
-
-	signature, err := GenerateSignature(newR, newS, p.service.pubkey, p.service.message)
-	if err != nil {
-		log.Println("error generating signature:", err)
-		return nil, err
-	}
-
-	sig := Signature{
-		R:         newR,
-		S:         newS,
-		Signature: signature,
-	}
-
-	return &sig, nil
+	return p.service.PostProcess()
 }
 
 func (p *ServerSigner) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("client")
+	return p.service.pm.GetNextMessageToSend(p.clientPeerID)
 }
 
 func (p *ServerSigner) HandleMessage(msg types.Message) error {
@@ -350,20 +422,25 @@ type ClientSigner struct {
 	service *serviceSigner
 }
 
-func NewClientSigner(pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ClientSigner, error) {
+func NewClientSigner(clientPeerID string, pubkeyStr PubkeyStr, share string, BKs map[string]BK, message []byte) (*ClientSigner, error) {
 	// will probably need a wrapper with JSON input
-
-	curve := elliptic_alice.Secp256k1()
 
 	pubkey, err := NewPubkey(pubkeyStr)
 	if err != nil {
 		return nil, err
 	}
 
-	service := NewServiceSigner(pubkey, share, BKs, message, curve)
+	newBKs := make(map[string]BK)
+	for key, value := range BKs {
+		if key == _serverID || key == clientPeerID {
+			newBKs[key] = value
+		}
+	}
 
-	pm := NewPeerManager("client")
-	pm.AddPeer("server")
+	service := NewServiceSigner(pubkey, share, newBKs, message)
+
+	pm := NewPeerManager(clientPeerID)
+	pm.AddPeer(_serverID)
 
 	err = service.Init(pm)
 	if err != nil {
@@ -386,47 +463,11 @@ func (p *ClientSigner) Process() (*Signature, error) {
 		return nil, fmt.Errorf("could not get client signer results")
 	}
 
-	publicKeyECDSA := p.service.pubkey.GetECDSA()
-
-	newR, newS, err := secp256k1SignatureToLowS(publicKeyECDSA, p.service.result.R, p.service.result.S)
-	if err != nil {
-		log.Println("error SignatureToLowS:", err)
-		return nil, err
-	}
-
-	signature, err := GenerateSignature(newR, newS, p.service.pubkey, p.service.message)
-	if err != nil {
-		log.Println("error generating signature:", err)
-		return nil, err
-	}
-
-	sig := Signature{
-		R:         newR,
-		S:         newS,
-		Signature: signature,
-	}
-	return &sig, nil
+	return p.service.PostProcess()
 }
 
-// func (p *ClientSigner) ProcessString() (string, error) {
-// 	sig, err := p.Process()
-
-// 	sigStr := SignatureStr{
-// 		R: sig.R.Text(16),
-// 		S: sig.S.Text(16),
-// 		V: hex.EncodeToString(sig.V),
-// 	}
-
-// 	res, err := json.Marshal(sigStr)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return string(res), nil
-// }
-
 func (p *ClientSigner) GetNextMessageToSend() ([]byte, error) {
-	return p.service.pm.GetNextMessageToSend("server")
+	return p.service.pm.GetNextMessageToSend(_serverID)
 }
 
 func (p *ClientSigner) HandleMessage(msg types.Message) error {
@@ -724,7 +765,7 @@ func GenerateSignature(r, s *big.Int, pubkey *Pubkey, msg []byte) ([]byte, error
 /// RECOVER PRIVATE KEY ///
 ///////////////////////////
 
-func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, clientShareStr string, BKs map[string]BK) (*ecdsa.PrivateKey, error) {
+func RecoverPrivateKeyWrapper(clientPeerID string, pubkeyStr PubkeyStr, serverShareStr string, clientShareStr string, BKs map[string]BK) (*ecdsa.PrivateKey, error) {
 	curve := elliptic_alice.Secp256k1()
 
 	pubkey, err := NewPubkey(pubkeyStr)
@@ -737,7 +778,7 @@ func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, client
 		return nil, err
 	}
 
-	dkgResultServer, err := ConvertDKGResult(pubkey, serverShareStr, BKs, curve)
+	dkgResultServer, err := ConvertDKGResult(pubkey, serverShareStr, BKs)
 	if err != nil {
 		return nil, err
 	}
@@ -752,12 +793,12 @@ func RecoverPrivateKeyWrapper(pubkeyStr PubkeyStr, serverShareStr string, client
 
 	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
 		share: dkgResultServer.Share,
-		bk:    dkgResultServer.Bks["server"],
+		bk:    dkgResultServer.Bks[_serverID],
 	})
 
 	RecoveryPeers = append(RecoveryPeers, RecoveryPeer{
 		share: clientShare,
-		bk:    dkgResultServer.Bks["client"],
+		bk:    dkgResultServer.Bks[clientPeerID],
 	})
 
 	return RecoverPrivateKey(curve, 2, ECPoint, RecoveryPeers)

@@ -1,6 +1,8 @@
 package tss
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -10,8 +12,8 @@ import (
 )
 
 type Message struct {
-	peerID  string
-	message interface{}
+	PeerID  string
+	Message interface{}
 }
 
 type PeerManager struct {
@@ -51,9 +53,11 @@ func (p *PeerManager) MustSend(peerID string, message interface{}) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// fmt.Println("Must send message to", peerID, ":", message)
+
 	p.outwardMessages = append(p.outwardMessages, Message{
-		peerID:  peerID,
-		message: message,
+		PeerID:  peerID,
+		Message: message,
 	})
 }
 
@@ -70,23 +74,89 @@ func (p *PeerManager) MustSend(peerID string, message interface{}) {
 
 // AddPeers adds peers to peer list.
 func (p *PeerManager) AddPeer(peerID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.peers[peerID] = true
 }
 
-func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
-	// log.Printf("get next message to send, outwardMessages:%v\n", p.outwardMessages)
+func (p *PeerManager) GetNextMessageToSendAll() (Message, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	var nextMsg []byte
-	i := 0
+	if len(p.outwardMessages) == 0 {
+		return Message{}, errors.New("no message to be sent")
+	}
+
+	ret := p.outwardMessages[0]
+
+	msg, ok := ret.Message.(proto.Message)
+	if !ok {
+		return Message{}, fmt.Errorf("invalid proto message for %s : %v", ret.PeerID, ret.Message)
+	}
+
+	bs, err := proto.Marshal(msg)
+	// bs, err := json.Marshal(ret.Message)
+	if err != nil {
+		log.Warn("Cannot marshal message", "err", err)
+		return Message{}, err
+	}
+
+	ret.Message = hex.EncodeToString(bs)
+
+	p.outwardMessages = p.outwardMessages[1:]
+
+	return ret, nil
+}
+
+func (p *PeerManager) GetNextMessageToSendPeer(peerID string) (Message, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var nextMsg Message
+	var newOutwardMessages []Message
 
 	for _, el := range p.outwardMessages {
-		if el.peerID == peerID && len(nextMsg) == 0 {
-			msg, ok := el.message.(proto.Message)
+		if el.PeerID == peerID && len(nextMsg.PeerID) == 0 {
+			// fmt.Println("GetNextMessageToSendPeer (", peerID, "):", el.Message)
+			nextMsg.PeerID = el.PeerID
+			msg, ok := el.Message.(proto.Message)
+			if !ok {
+				return Message{}, fmt.Errorf("invalid proto message for %s : %+v", peerID, el.Message)
+			}
+
+			bs, err := proto.Marshal(msg)
+			// bs, err := json.Marshal(el.Message)
+			if err != nil {
+				log.Warn("Cannot marshal message", "err", err)
+				return Message{}, err
+			}
+
+			nextMsg.Message = hex.EncodeToString(bs)
+		} else {
+			newOutwardMessages = append(newOutwardMessages, el)
+		}
+	}
+
+	p.outwardMessages = newOutwardMessages
+
+	return nextMsg, nil
+}
+
+// Not appropriate for Adder
+func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var nextMsg []byte
+	var newOutwardMessages []Message
+
+	for _, el := range p.outwardMessages {
+		if el.PeerID == peerID && len(nextMsg) == 0 {
+			msg, ok := el.Message.(proto.Message)
 			if !ok {
 				return nil, fmt.Errorf("invalid proto message")
 			}
-
-			// log.Printf("next message to send: %+v\n", msg)
 
 			bs, err := proto.Marshal(msg)
 			if err != nil {
@@ -96,21 +166,19 @@ func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 
 			nextMsg = bs
 		} else {
-			p.mu.Lock()
-			p.outwardMessages[i] = el
-			p.mu.Unlock()
-			i++
+			newOutwardMessages = append(newOutwardMessages, el)
 		}
 	}
 
-	p.outwardMessages = p.outwardMessages[:i]
-
-	// log.Println("post GetNextMessageToSend outwardMessages:", p.outwardMessages)
+	p.outwardMessages = newOutwardMessages
 
 	return nextMsg, nil
 }
 
 func (p *PeerManager) RegisterHandleMessage(handleFunc func(types.Message) error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.handleMessageFunction = handleFunc
 }
 

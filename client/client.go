@@ -10,12 +10,16 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/getmeemaw/meemaw/utils/tss"
 	"github.com/getmeemaw/meemaw/utils/types"
+	"github.com/getmeemaw/meemaw/utils/ws"
+	"github.com/google/uuid"
 	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 
 	_ "golang.org/x/mobile/bind"
 )
@@ -39,13 +43,49 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Prepare DKG process
 	path := "/dkg?token=" + token
 
+	_hostHttp, err := urlToHttp(host)
+	if err != nil {
+		log.Println("error getting http host:", err)
+		return nil, "", err
+	}
+
+	// Check if wallet already exists
+	resp, err := http.Get(_hostHttp + path)
+	if err != nil {
+		log.Println("error dialing dkg (first call):", err)
+		return nil, "", err
+	}
+
+	if resp.StatusCode == 401 {
+		return nil, "", &types.ErrUnauthorized{}
+	} else if resp.StatusCode == 400 {
+		return nil, "", &types.ErrBadRequest{}
+	} else if resp.StatusCode == 404 {
+		return nil, "", &types.ErrNotFound{}
+	} else if resp.StatusCode == 409 {
+		log.Println("existing wallet")
+		return nil, "", &types.ErrConflict{}
+	} else if resp.StatusCode == 426 {
+		log.Println("no existing wallet")
+	} else {
+		log.Println("error dialing dkg (first call):", err)
+		return nil, "", errors.New("error dialing dkg (first call)")
+	}
+	defer resp.Body.Close()
+
 	_host, err := urlToWs(host)
 	if err != nil {
 		log.Println("error getting ws host:", err)
 		return nil, "", err
 	}
 
-	dkg, err := tss.NewClientDkg()
+	// Init DKG
+	peerID := uuid.New().String()
+	if strings.HasSuffix(os.Args[0], ".test") {
+		peerID = "client"
+	}
+
+	dkg, err := tss.NewClientDkg(peerID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -53,83 +93,172 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	c, resp, err := websocket.Dial(ctx, _host+path, nil)
+	c, _, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
-		if resp.StatusCode == 401 {
-			return nil, "", &types.ErrUnauthorized{}
-		} else if resp.StatusCode == 400 {
-			return nil, "", &types.ErrBadRequest{}
-		} else if resp.StatusCode == 404 {
-			return nil, "", &types.ErrNotFound{}
-		} else if resp.StatusCode == 409 {
-			return nil, "", &types.ErrConflict{}
-		} else {
-			log.Println("error dialing websocket:", err)
-			return nil, "", err
-		}
+		log.Println("error dialing websocket:", err)
+		return nil, "", err
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
+	serverDone := make(chan struct{})
 	errs := make(chan error, 2)
 
-	go tss.Send(dkg, ctx, errs, c)
-	go tss.Receive(dkg, ctx, errs, c)
+	var stage uint32 = 0
 
-	// Start DKG process.
-	res, err := dkg.Process()
+	var metadata string
+
+	// send peerID
+	peerIdMsg := ws.Message{
+		Type: ws.PeerIdBroadcastMessage,
+		Msg:  peerID,
+	}
+	err = wsjson.Write(ctx, c, peerIdMsg)
 	if err != nil {
+		log.Println("Dkg - peerIdMsg - error writing json through websocket:", err)
+		errs <- err
 		return nil, "", err
 	}
+
+	go func() {
+		for {
+			log.Println("Dkg - wsjson.Read")
+			var msg ws.Message
+			err := wsjson.Read(ctx, c, &msg)
+			if err != nil {
+				// Check if the context was canceled
+				if ctx.Err() == context.Canceled {
+					log.Println("read operation canceled")
+					return
+				}
+
+				// Check if the WebSocket was closed normally
+				closeStatus := websocket.CloseStatus(err)
+				if closeStatus == websocket.StatusNormalClosure || closeStatus == websocket.StatusGoingAway {
+					log.Println("WebSocket closed normally")
+					return
+				}
+
+				// Handle other errors
+				log.Println("Dkg - error reading message from websocket:", err)
+				log.Println("websocket.CloseStatus(err):", closeStatus)
+				errs <- err
+				return
+			}
+
+			log.Println("received message in Dkg:", msg)
+
+			switch msg.Type {
+			case ws.TssMessage:
+				// verify stage : if tss message but we're at storage stage or further, discard
+				if stage > msg.Type.MsgStage {
+					// discard
+					log.Println("TSS message but we're at later stage; stage:", stage)
+					continue
+				}
+
+				log.Println("Dkg - received tss message:", msg)
+
+				// Decode TSS msg
+				byteString, err := hex.DecodeString(msg.Msg)
+				if err != nil {
+					log.Println("error decoding hex:", err)
+					errs <- err
+					return
+				}
+
+				tssMsg := &tss.Message{}
+				err = json.Unmarshal(byteString, &tssMsg)
+				if err != nil {
+					log.Println("could not unmarshal tss msg:", err)
+					errs <- err
+					return
+				}
+
+				log.Println("Dkg - trying to handle tssMsg:", tssMsg)
+
+				// Handle tss message (NOTE : will automatically, in ServerAdd.HandleMessage, redirect to other client if needs be)
+				err = dkg.HandleMessage(tssMsg)
+				if err != nil {
+					log.Println("could not handle tss msg:", err)
+					errs <- err
+					return
+				}
+
+				log.Println("Dkg - tssMsg handled")
+
+			case ws.MetadataMessage:
+				// note : have a timer somewhere, if after X seconds we don't have this message, then it means the process failed.
+
+				// update metadata to return it at the end
+				metadata = string(msg.Msg)
+
+				log.Println("Dkg - received metadata (=> sending metadataAck):", metadata)
+
+				//
+
+				// SEND MetadataAckMessage
+				ack := ws.Message{
+					Type: ws.MetadataAckMessage,
+					Msg:  "",
+				}
+				err = wsjson.Write(ctx, c, ack)
+				if err != nil {
+					log.Println("Dkg - MetadataAckMessage - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+
+				close(serverDone)
+
+			default:
+				log.Println("Unexpected message type:", msg.Type)
+				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
+				err := wsjson.Write(ctx, c, errorMsg)
+				if err != nil {
+					log.Println("RegisterDevice - errorMsg - error writing json through websocket:", err)
+					errs <- err
+					return
+				}
+			}
+		}
+	}()
+
+	// TSS sending and listening for finish signal
+	go ws.TssSend(dkg.GetNextMessageToSend, serverDone, errs, ctx, c, "Dkg")
+
+	// Start adder
+	dkgResult, err := dkg.Process()
+	if err != nil {
+		log.Println("error processing adder:", err)
+		errs <- err
+		return nil, "", nil
+	}
+
+	log.Println("Dkg process finished")
 
 	// Error management
-	processErr := <-errs // wait for websocket closure from server
-	if ctx.Err() == context.Canceled {
-		log.Println("websocket closed by context cancellation:", processErr)
-		return nil, "", processErr
-	} else if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
-		log.Println("websocket closed normally")
-		cancel()
-	} else {
-		log.Println("error during websocket connection:", processErr) // it's ok, as the proper completion will be verified with /dkgtwo
-		cancel()
-	}
-
-	//////////
-	/// METADATA
-
-	_host, err = urlToHttp(host)
+	err = ws.ProcessErrors(errs, ctx, c, "Dkg")
 	if err != nil {
-		log.Println("error getting http host:", err)
+		c.Close(websocket.StatusInternalError, "dkg process failed")
 		return nil, "", err
 	}
 
-	// Get metadata from /dkgtwo
-	path = "/dkgtwo?token=" + token
-	resp, err = http.Get(_host + path)
-	if err != nil {
-		log.Println("failed to call dkgtwo:", err)
-		return nil, "", err
-	}
-	defer resp.Body.Close() // Ensure the response body is closed
+	stage = 40 // only move to next stage after tss process is done
 
-	if resp.StatusCode != 200 {
-		log.Println("error during dkgtwo:", resp.Status)
-		return nil, "", errors.New("error during dkgtwo")
-	}
+	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
 
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response body: %v", err)
-	}
+	// Avoid closing connection until we received everything we needed from server
+	<-serverDone
 
-	metadata := string(body)
+	// time.Sleep(2000 * time.Millisecond)
+	cancel()
 
-	// time.Sleep(120 * time.Hour) // debug
+	log.Println("Dkg serverDone")
 
-	// c.Close(websocket.StatusNormalClosure, "")
+	// CLOSE WEBSOCKET
+	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
 
-	return res, metadata, nil
+	return dkgResult, metadata, nil
 }
 
 // Sign performs the full signing process on the client side
@@ -143,15 +272,6 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 		return nil, &types.ErrUnauthorized{}
 	}
 
-	// Prepare signing process
-	path := "/sign?msg=" + hex.EncodeToString(message) + "&token=" + token
-
-	_host, err := urlToWs(host)
-	if err != nil {
-		log.Println("error getting ws host:", err)
-		return nil, &types.ErrBadRequest{}
-	}
-
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
@@ -159,9 +279,20 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 		return nil, &types.ErrBadRequest{}
 	}
 
+	// Prepare signing process
+
 	pubkeyStr := dkgResult.Pubkey
 	BKs := dkgResult.BKs
 	share := dkgResult.Share
+	clientPeerID := dkgResult.PeerID
+
+	path := "/sign?msg=" + hex.EncodeToString(message) + "&token=" + token + "&peer=" + clientPeerID
+
+	_host, err := urlToWs(host)
+	if err != nil {
+		log.Println("error getting ws host:", err)
+		return nil, &types.ErrBadRequest{}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -188,7 +319,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
 
-	signer, err := tss.NewClientSigner(pubkeyStr, share, BKs, message)
+	signer, err := tss.NewClientSigner(clientPeerID, pubkeyStr, share, BKs, message)
 	if err != nil {
 		log.Println("error when getting new client signer:", err)
 		return nil, &types.ErrBadRequest{}
@@ -226,9 +357,9 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	return signature, nil
 }
 
-// Recover recovers the private key from the server and client shares
+// Export exports the private key from the server and client shares
 // Requires the dkgResult (i.e. client-side of wallet), authData (to confirm authorization and identify user) and host
-func Recover(host string, dkgResultStr string, metadata string, authData string) (string, error) {
+func Export(host string, dkgResultStr string, metadata string, authData string) (string, error) {
 
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
@@ -238,7 +369,7 @@ func Recover(host string, dkgResultStr string, metadata string, authData string)
 	}
 
 	// Prepare query
-	path := "/recover?token=" + token
+	path := "/export?token=" + token
 
 	_host, err := urlToHttp(host)
 	if err != nil {
@@ -255,10 +386,12 @@ func Recover(host string, dkgResultStr string, metadata string, authData string)
 	}
 
 	share := dkgResult.Share
+	clientPeerID := dkgResult.PeerID
 
 	// Create the form data
 	formData := url.Values{
-		"share": {share},
+		"share":        {share},
+		"clientPeerID": {clientPeerID},
 	}
 
 	// Send POST request

@@ -67,8 +67,6 @@ func TestDkg(t *testing.T) {
 	///////////////////
 	/// TEST 2 : user already has a wallet on server
 
-	// NOTE : TO BE UPDATED WHEN IMPLEMENTING MULTI DEVICE : If new device, should be allowed
-
 	testCase = "test 2 (user already has a wallet on server)"
 
 	params = getStdParameters()
@@ -127,7 +125,7 @@ func TestSign(t *testing.T) {
 	/// TEST 5 : wrong share on client
 
 	params = getStdParameters()
-	params["dkgResultClientStr"] = `{"Pubkey":{"X":"64927784304280585002232059641609611887834878205473395822489518307235035286543","Y":"25782693251874019172725009347410644829502824377621177953293307398262537993134"},"BKs":{"client":{"X":"111886675541902333686715770753860772166725964179322493963066654360904646044329","Rank":0},"server":{"X":"105724717407398644489128719447825679148844350134379485277252132502254966714726","Rank":0}},"Share":"18768601278517953072996637218594114592905334395321844506825806423166074118045","Address":"0x5749A8Ed0C00C963c7b19ea05A51131077305c8A"}`
+	params["dkgResultClientStr"] = `{"Pubkey":{"X":"64927784304280585002232059641609611887834878205473395822489518307235035286543","Y":"25782693251874019172725009347410644829502824377621177953293307398262537993134"},"BKs":{"client":{"X":"111886675541902333686715770753860772166725964179322493963066654360904646044329","Rank":0},"server":{"X":"105724717407398644489128719447825679148844350134379485277252132502254966714726","Rank":0}},"Share":"18768601278517953072996637218594114592905334395321844506825806423166074118045","Address":"0x5749A8Ed0C00C963c7b19ea05A51131077305c8A","PeerID":"client"}`
 
 	signature, err = signingTestProcessLimitedInTime(params)
 	types.ProcessShouldError("test 5 (wrong share on client)", err, &types.ErrTssProcessFailed{}, signature, t)
@@ -240,7 +238,7 @@ func dkgTestProcess(parameters map[string]string) (*tss.DkgResult, *tss.DkgResul
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		_, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		_, err = _server.Vault().StoreWallet(ctx, parameters["userIdStored"], "client", parameters["userAgent"], &dkgResultServer)
 		if err != nil {
 			log.Println("Error storing wallet:", err)
 			return nil, nil, err
@@ -320,7 +318,7 @@ func signingTestProcess(parameters map[string]string) (*tss.Signature, error) {
 
 		log.Printf("dkgResultServer: %+v\n", dkgResultServer)
 
-		metadata, err = _server.Vault().StoreWallet(ctx, parameters["userAgent"], parameters["userIdStored"], &dkgResultServer)
+		metadata, err = _server.Vault().StoreWallet(ctx, parameters["userIdStored"], "client", parameters["userAgent"], &dkgResultServer)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +364,7 @@ func getStdParameters() map[string]string {
 	stdParameters["userIdStored"] = "my-super-user-id-" + guid
 	stdParameters["userIdUsed"] = "my-super-user-id-" + guid
 	stdParameters["dkgResultServerStr"] = `{"Pubkey":{"X":"64927784304280585002232059641609611887834878205473395822489518307235035286543","Y":"25782693251874019172725009347410644829502824377621177953293307398262537993134"},"BKs":{"client":{"X":"111886675541902333686715770753860772166725964179322493963066654360904646044329","Rank":0},"server":{"X":"105724717407398644489128719447825679148844350134379485277252132502254966714726","Rank":0}},"Share":"98852749347118528790599917495626273581652498656930690683302586059893129350566","Address":"0x5749A8Ed0C00C963c7b19ea05A51131077305c8A"}`
-	stdParameters["dkgResultClientStr"] = `{"Pubkey":{"X":"64927784304280585002232059641609611887834878205473395822489518307235035286543","Y":"25782693251874019172725009347410644829502824377621177953293307398262537993134"},"BKs":{"client":{"X":"111886675541902333686715770753860772166725964179322493963066654360904646044329","Rank":0},"server":{"X":"105724717407398644489128719447825679148844350134379485277252132502254966714726","Rank":0}},"Share":"18768601278517953072996637218594114592905334395321844506825806423166074118044","Address":"0x5749A8Ed0C00C963c7b19ea05A51131077305c8A"}`
+	stdParameters["dkgResultClientStr"] = `{"Pubkey":{"X":"64927784304280585002232059641609611887834878205473395822489518307235035286543","Y":"25782693251874019172725009347410644829502824377621177953293307398262537993134"},"BKs":{"client":{"X":"111886675541902333686715770753860772166725964179322493963066654360904646044329","Rank":0},"server":{"X":"105724717407398644489128719447825679148844350134379485277252132502254966714726","Rank":0}},"Share":"18768601278517953072996637218594114592905334395321844506825806423166074118044","Address":"0x5749A8Ed0C00C963c7b19ea05A51131077305c8A","PeerID":"client"}`
 	stdParameters["userAgent"] = "my-super-user-agent-" + guid
 
 	return stdParameters

@@ -150,6 +150,48 @@ public struct Wallet: EthereumAccountProtocol {
 
         return SignedTransaction(transaction: transaction, signature: signature)
     }
+
+    public func Export() throws -> String {
+        let ret = TsslibExport(self.server, self.wallet, self.auth)
+
+        if let privateKey = ret {
+            if privateKey.successful {
+                return "0x"+privateKey.result
+            } else {
+                print(privateKey.error)
+            }
+        }
+
+        throw TssError.exportError
+    }
+
+    public func AcceptDevice() throws -> Void {
+        let ret = TsslibAcceptDevice(self.server, self.wallet, self.auth)
+
+        if let res = ret {
+            if res.successful {
+                return
+            } else {
+                print(res.error)
+            }
+        }
+
+        throw TssError.acceptError
+    }
+
+    public func Backup() throws -> String {
+        let ret = TsslibBackup(self.server, self.wallet, self.auth)
+
+        if let backup = ret {
+            if backup.successful {
+                return backup.result
+            } else {
+                print(backup.error)
+            }
+        }
+
+        throw TssError.backupError
+    }
 }
 
 enum EthereumSignerError: Error {
@@ -160,7 +202,12 @@ enum EthereumSignerError: Error {
 enum TssError: Error {
     case identifyError
     case dkgError
+    case walletExistsError
+    case registerError
+    case acceptError
     case signError
+    case exportError
+    case backupError
 }
 
 public struct Meemaw {
@@ -171,7 +218,7 @@ public struct Meemaw {
     }
     
     // GetWallet returns the wallet if it exists or creates a new one
-    public func GetWallet(auth: String) async throws -> Wallet {
+    public func GetWallet(auth: String, callbackRegisterStarted: ((String?) -> Void)? = nil, callbackRegisterDone: ((String?) -> Void)? = nil) async throws -> Wallet {
         
         var dkgResult = ""
         
@@ -204,15 +251,96 @@ public struct Meemaw {
             throw error
         }
 
-        // 2. If nothing stored : Dkg + store
+        var walletExistsServer = false
+
+        // 2. If nothing stored : Dkg
         do {
             dkgResult = try dkg(auth: auth)
-            try StoreWallet(dkgResult: dkgResult, userId: userId)
-            return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
+        } catch TssError.walletExistsError {
+            print("Wallet already exists on server side. Registering device.")
+            walletExistsServer = true
         } catch {
-            print("Error while dkg or storing wallet")
+            print("Error while dkg")
             throw error
         }
+
+        // 3. Register if needed
+        if walletExistsServer {
+            do {
+                if let callbackRegisterStarted = callbackRegisterStarted {
+                    // callbackRegisterStarted("devicecode")
+                    callbackRegisterStarted()
+                } else {
+                    print("register device started, but no callback function provided")
+                }
+
+                dkgResult = try registerDevice(auth: auth)
+
+                if let callbackRegisterDone = callbackRegisterDone {
+                    // callbackRegisterDone("devicecode")
+                    callbackRegisterDone()
+                } else {
+                    print("register device is done, but no callback function provided")
+                }
+            } catch {
+                print("Error while registering device")
+                throw error
+            }
+        }
+
+        // 3. Store
+        do {
+            try StoreWallet(dkgResult: dkgResult, userId: userId)
+        } catch {
+            print("Error while storing wallet")
+            throw error
+        }
+
+        return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
+    }
+
+    public func GetWalletFromBackup(auth: String, backup: String) async throws -> Wallet {
+        // Get userId from authData
+        let ret = TsslibIdentify(self._server, auth)
+        var userId = ""
+        
+        if let userIdRet = ret {
+            if userIdRet.successful {
+                userId = userIdRet.result
+            } else {
+                print("error when identify:")
+                print(userIdRet.error)
+                throw TssError.identifyError
+            }
+        }
+
+        if userId.isEmpty {
+            throw TssError.identifyError
+        }
+
+        // Create wallet based on backup
+        let backup = TsslibFromBackup(self._server, backup, auth)
+
+        var dkgResult = ""
+
+        if let dkg = backup {
+            if dkg.successful {
+                dkgResult = dkg.result
+            } else {
+                print(dkg.error)
+                throw TssError.backupError
+            }
+        }
+
+        // Store
+        do {
+            try StoreWallet(dkgResult: dkgResult, userId: userId)
+        } catch {
+            print("Error while storing wallet")
+            throw error
+        }
+
+        return Wallet(wallet: dkgResult, address: try GetAddressFromDkgResult(dkgResult: dkgResult), server: self._server, auth: auth)
     }
     
     private func dkg(auth: String) throws -> String {
@@ -222,13 +350,30 @@ public struct Meemaw {
         if let dkg = ret {
             if dkg.successful {
                 return dkg.result
+            } else if dkg.error == "conflict" {
+                throw TssError.walletExistsError
             } else {
-                print("error when dkg:")
+                print(dkg.error)
+            }
+        }
+        
+        throw TssError.dkgError
+    }
+    
+    private func registerDevice(auth: String) throws -> String {
+        
+        let ret = TsslibRegisterDevice(self._server, auth)
+
+        if let dkg = ret {
+            if dkg.successful {
+                return dkg.result
+            } else {
                 print(dkg.error)
             }
         }
 
-        throw TssError.dkgError
+
+        throw TssError.registerError
     }
     
     enum WalletStorageError: Error {
@@ -289,14 +434,22 @@ public struct Meemaw {
     private func GetAddressFromDkgResult(dkgResult: String) throws -> String {
         if let data = dkgResult.data(using: .utf8) {
             do {
-                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let address = json["Address"] as? String {
+                print("test1")
+                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                let dkgResultStr = json["DkgResultStr"] as? String,
+                let dkgResultData = dkgResultStr.data(using: .utf8),
+                let dkgResultJson = try JSONSerialization.jsonObject(with: dkgResultData, options: []) as? [String: Any],
+                let address = dkgResultJson["Address"] as? String {
+                    print("test2:", address)
                     return address
                 }
+                print("test3")
             } catch {
                 print("Error parsing JSON: \(error)")
                 throw error
             }
         }
+        print("test4")
         
         throw NSError(domain: NSCocoaErrorDomain, code: NSPropertyListReadCorruptError, userInfo: nil)
     }

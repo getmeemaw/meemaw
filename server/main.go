@@ -27,9 +27,10 @@ type Server struct {
 }
 
 type Vault interface {
-	WalletExists(context.Context, string) error
-	StoreWallet(context.Context, string, string, *tss.DkgResult) (string, error)
-	RetrieveWallet(context.Context, string) (*tss.DkgResult, error)
+	WalletExists(ctx context.Context, foreignKey string) error
+	StoreWallet(ctx context.Context, foreignKey string, peerID string, userAgent string, dkgResult *tss.DkgResult) (string, error)
+	RetrieveWallet(ctx context.Context, foreignKey string) (*tss.DkgResult, error)
+	AddPeer(ctx context.Context, foreignKey string, peerID string, userAgent string, updatedDkgResult *tss.DkgResult) error
 }
 
 // NewServer creates a new server object used in the "cmd" package and in tests
@@ -73,13 +74,23 @@ func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Se
 	}
 	r.With(compress).Get("/meemaw.wasm", server.ServeWasm)
 
-	// tss endpoints
+	// auth management
 	r.With(server.identityMiddleware).Get("/identify", server.IdentifyHandler)
 	r.With(server.identityMiddleware).Get("/authorize", server.AuthorizeHandler)
+
+	// dkg
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
-	r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
+	// r.With(server.authMiddleware).Get("/dkgtwo", server.DkgTwoHandler)
+
+	// sign
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
-	r.With(server.authMiddleware).Post("/recover", server.RecoverHandler)
+
+	// export private key
+	r.With(server.authMiddleware).Post("/export", server.ExportHandler)
+
+	// multi-device
+	r.With(server.authMiddleware).Get("/register", server.RegisterDeviceHandler)
+	r.With(server.authMiddleware).Get("/accept", server.AcceptDeviceHandler)
 
 	server._router = r
 

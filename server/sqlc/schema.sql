@@ -19,7 +19,8 @@ CREATE TABLE devices (
     id BIGSERIAL PRIMARY KEY,
     user_id bigint NOT NULL REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     wallet_id bigint NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    peer_id text NOT NULL DEFAULT '',
     user_agent text NOT NULL DEFAULT ''
 );
 
--- CREATE UNIQUE INDEX device_identifier ON public.devices USING btree (user_id, wallet_id, user_agent);
+-- CREATE UNIQUE INDEX device_identifier ON public.devices USING btree (user_id, wallet_id, peer_id);

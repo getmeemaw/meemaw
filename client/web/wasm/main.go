@@ -26,10 +26,14 @@ func main() {
 
 	js.Global().Set("Identify", asyncFunc(Identify))
 	js.Global().Set("Dkg", asyncFunc(Dkg))
+	js.Global().Set("RegisterDevice", asyncFunc(RegisterDevice))
+	js.Global().Set("AcceptDevice", asyncFunc(AcceptDevice))
+	js.Global().Set("Backup", asyncFunc(Backup))
+	js.Global().Set("FromBackup", asyncFunc(FromBackup))
 	js.Global().Set("SignBytes", asyncFunc(SignBytes))
 	// js.Global().Set("SignEthMessage", asyncFunc(SignEthMessage))
 	js.Global().Set("SignEthTransaction", asyncFunc(SignEthTransaction))
-	js.Global().Set("Recover", asyncFunc(Recover))
+	js.Global().Set("Export", asyncFunc(Export))
 
 	select {}
 }
@@ -80,6 +84,93 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 	return string(respJSON), err
 }
 
+// input : host, authData
+// output : json encoded dkgResult, error
+func RegisterDevice(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	authData := args[1].String()
+
+	dkgResult, metadata, err := client.RegisterDevice(host, authData, "web")
+	if err != nil {
+		log.Println("error while registerDevice:", err)
+		return nil, err
+	}
+
+	resp := dkgResponse{
+		DkgResult: dkgResult,
+		Metadata:  metadata,
+	}
+
+	respJSON, err := json.Marshal(resp)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return nil, err
+	}
+
+	return string(respJSON), err
+}
+
+// input : host, dkgResultStr, metadata, authData
+// output : error
+func AcceptDevice(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	dkgResultStr := args[1].String()
+	metadata := args[2].String()
+	authData := args[3].String()
+
+	err := client.AcceptDevice(host, dkgResultStr, metadata, authData)
+	if err != nil {
+		log.Println("error while acceptDevice:", err)
+		return nil, err
+	}
+
+	return nil, err
+}
+
+// input : host, dkgResultStr, metadata, authData
+// output : backup, error
+func Backup(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	dkgResultStr := args[1].String()
+	metadata := args[2].String()
+	authData := args[3].String()
+
+	backup, err := client.Backup(host, dkgResultStr, metadata, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return nil, err
+	}
+
+	return backup, err
+}
+
+// input : host, backup, authData
+// output : json encoded dkgResult, error
+func FromBackup(this js.Value, args []js.Value) (any, error) {
+	host := args[0].String()
+	backup := args[1].String()
+	authData := args[2].String()
+
+	dkgResult, metadata, err := client.FromBackup(host, backup, authData)
+	if err != nil {
+		log.Println("error while Backup:", err)
+		return nil, err
+	}
+
+	resp := dkgResponse{
+		DkgResult: dkgResult,
+		Metadata:  metadata,
+	}
+
+	respJSON, err := json.Marshal(resp)
+	if err != nil {
+		log.Println("error while marshaling dkgresult json:", err)
+		return nil, err
+	}
+
+	return string(respJSON), err
+}
+
 // input : host, message (hex encoded bytes), dkgResultStr, authData
 // output : signed message, error
 func SignBytes(this js.Value, args []js.Value) (any, error) {
@@ -109,13 +200,13 @@ func SignBytes(this js.Value, args []js.Value) (any, error) {
 
 // input : host, dkgResultStr, authData
 // output : privateKey, error
-func Recover(this js.Value, args []js.Value) (any, error) {
+func Export(this js.Value, args []js.Value) (any, error) {
 	host := args[0].String()
 	dkgResultStr := args[1].String()
 	metadata := args[2].String()
 	authData := args[3].String()
 
-	privateKey, err := client.Recover(host, dkgResultStr, metadata, authData)
+	privateKey, err := client.Export(host, dkgResultStr, metadata, authData)
 	if err != nil {
 		log.Println("error while signing:", err)
 		return nil, err

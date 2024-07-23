@@ -1,6 +1,6 @@
 {
   "name": "@getmeemaw/meemaw-js",
-  "version": "0.2.0",
+  "version": "1.2.0",
   "description": "Web SDK of Meemaw",
   "main": "index.js",
   "repository": {

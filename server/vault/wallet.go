@@ -25,19 +25,19 @@ func NewVault(queries *database.Queries) *Vault {
 }
 
 // WalletExists verifies if a wallet already exists
-func (vault *Vault) WalletExists(ctx context.Context, userId string) error {
-	_, err := vault._queries.GetUserByForeignKey(ctx, userId)
+func (vault *Vault) WalletExists(ctx context.Context, foreignKey string) error {
+	_, err := vault._queries.GetUserByForeignKey(ctx, foreignKey)
 	return err
 }
 
 ///////
 
-// StoreWallet upserts a wallet (if it already exists, it does nothing, no error returned)
+// StoreWallet inserts a wallet (if it already exists, it does nothing, no error returned)
 // Tested in integration tests (with throw away db)
-func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, foreignKey string, dkgResults *tss.DkgResult) (string, error) {
+func (vault *Vault) StoreWallet(ctx context.Context, foreignKey string, peerID string, userAgent string, dkgResult *tss.DkgResult) (string, error) {
 
 	// Encode dkgResults to json
-	jsonDkgResults, err := json.Marshal(dkgResults)
+	jsonDkgResult, err := json.Marshal(dkgResult)
 	if err != nil {
 		log.Println("could not marshal dkgResults to json")
 		return "", err
@@ -50,42 +50,74 @@ func (vault *Vault) StoreWallet(ctx context.Context, userAgent string, foreignKe
 	}
 
 	// Encrypt dkgResults with client key (so that server shares are not fully exposed in case of a breach)
-	nonceClient, ClientEncryptedDkgResults, err := encryptAES(jsonDkgResults, clientKey)
+	nonceClient, ClientEncryptedDkgResult, err := encryptAES(jsonDkgResult, clientKey)
 	if err != nil {
 		log.Println("error while encrypting with client key:", err)
 		return "", err
 	}
 
 	// Store in DB
-	user, err := vault._queries.AddUser(ctx, foreignKey)
-	if err != nil {
-		return "", err
-	}
-
-	walletQueryParams := database.AddWalletParams{
-		UserId:              user.ID,
-		PublicAddress:       dkgResults.Address,
-		EncryptedDkgResults: ClientEncryptedDkgResults,
+	dkgQueryParams := database.DkgParams{
+		UserAgent:           userAgent,
+		PeerId:              peerID,
+		ForeignKey:          foreignKey,
+		PublicAddress:       dkgResult.Address,
+		EncryptedDkgResults: ClientEncryptedDkgResult,
 		Nonce:               nonceClient,
 	}
 
-	wallet, err := vault._queries.AddWallet(ctx, walletQueryParams)
-	if err != nil {
-		return "", err
-	}
-
-	deviceQueryParams := database.AddDeviceParams{
-		UserId:    user.ID,
-		WalletId:  wallet.ID,
-		UserAgent: userAgent,
-	}
-
-	_, err = vault._queries.AddDevice(ctx, deviceQueryParams)
+	_, err = vault._queries.Dkg(ctx, dkgQueryParams)
 	if err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(clientKey), nil
+}
+
+// AddDevice adds a device in DB, including updating the BKs
+// Requires the metadata in the context
+func (vault *Vault) AddPeer(ctx context.Context, foreignKey string, peerID string, userAgent string, updatedDkgResult *tss.DkgResult) error {
+	// get client key from context
+	clientKeyStr, ok := ctx.Value(types.ContextKey("metadata")).(string)
+	if !ok {
+		return errors.New("could not find customer identifier")
+	}
+
+	clientKey, err := hex.DecodeString(clientKeyStr)
+	if err != nil {
+		log.Println("error hex decoding clientKey(", clientKeyStr, "):", err)
+		return err
+	}
+
+	// Encode dkgResults to json
+	jsonDkgResult, err := json.Marshal(updatedDkgResult)
+	if err != nil {
+		log.Println("could not marshal dkgResults to json")
+		return err
+	}
+
+	// Encrypt dkgResults with client key (so that server shares are not fully exposed in case of a breach)
+	nonceClient, ClientEncryptedDkgResult, err := encryptAES(jsonDkgResult, clientKey)
+	if err != nil {
+		log.Println("error while encrypting with client key:", err)
+		return err
+	}
+
+	// Update in DB
+	dkgQueryParams := database.AddPeerParams{
+		UserAgent:           userAgent,
+		PeerId:              peerID,
+		ForeignKey:          foreignKey,
+		EncryptedDkgResults: ClientEncryptedDkgResult,
+		Nonce:               nonceClient,
+	}
+
+	_, err = vault._queries.AddPeer(ctx, dkgQueryParams)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // RetrieveWallet retrieves a wallet from DB based on the userID of the user (which is a loose foreign key, the format will depend on the auth provider)
@@ -107,7 +139,7 @@ func (vault *Vault) RetrieveWallet(ctx context.Context, foreignKey string) (*tss
 
 	clientKey, err := hex.DecodeString(clientKeyStr)
 	if err != nil {
-		log.Println("error hex decoding clientKey")
+		log.Println("error hex decoding clientKey(", clientKeyStr, "):", err)
 		return nil, err
 	}
 

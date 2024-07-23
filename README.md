@@ -7,7 +7,7 @@
 <h3 align="center">Trustless and Grandma-friendly Wallet as a Service</h3>
 
 <p align="center">
-    <img src="https://img.shields.io/badge/Latest-v0.2-blue"/>
+    <img src="https://img.shields.io/badge/Latest-v1.2.0-blue"/>
     <img src="https://img.shields.io/badge/Stability-Beta-orange"/>
     <img src="https://img.shields.io/badge/License-AGPL%20v3-green.svg"/>
 </p>
@@ -53,7 +53,8 @@ Available right now:
 
 - [x] **Trustless**: Meemaw wallets are MPC-TSS (Multi-Party Computation with Threshold Signature Scheme) wallets. They are non-custodial and zero-knowledge: the private keys of your users never appear on your servers so they don't need to trust you with their assets.
 - [x] **Easy**: You can easily deploy Meemaw with Docker. You can then use the client SDKs to easily integrate it in a few lines of code. It's easy to offer an amazing web2-like experience to your users.
-- [x] **Web & iOS**: It's super easy to integrate Meemaw in your Web & iOS apps. Just use the appropriate SDK and you're good to go. Note that we are planning to add support for Android and cross-platform frameworks as well.
+- [x] **Multi-device**: Most MPC-TSS Wallet providers only allow one device per wallet, because it's easier to build. With Meemaw, your users can add additional devices for practicality and redundancy.
+- [x] **Web & iOS**: It's easy to integrate Meemaw in your Web & iOS apps. Use the appropriate SDK and you're good to go. Note that we are planning to add support for Android and cross-platform frameworks as well.
 - [x] **Integrates with your Auth**: Meemaw is built so that you can easily integrate with your own Auth provider. We are also continuously adding one-click integrations for more and more third-party Auth providers.
 - [x] **Battle-tested technologies**: Meemaw is NOT innovating on the actual technology (TSS and others). Instead, it aims at bringing together established and production-ready technologies to form a coherent experience while reducing risk. 
 <!-- the next points are not as key and important, people will see it in docs or it's obvious -->
@@ -65,7 +66,6 @@ Available right now:
 Exciting things we're looking forward to:
 
 - [ ] **Android & Cross-platform frameworks**: If you're using Android or cross-platform frameworks, we plan to be able to cover your needs. Meemaw will be compatible with Web, iOS, Android, React Native, Flutter and Kotlin Multiplatform.
-- [ ] **Multi-devices**: Most MPC-TSS Wallet providers only allow your users to access their wallet from one device. The plan is to allow your users to securely add new devices that are also able to access the wallet and its assets.
 - [ ] **Biometrics & Passkeys**: Depending on platforms and applications, you will be able to encrypt and protect client shares with biometrics and/or passkeys. We want to reach state of the art security on all aspects.
 - [ ] **Cloud offering**: You can easily self-host Meemaw with a few clicks, and soon you will be able to trust us to host it for you and make your life easier and safer. We will also offer Entreprise services and additional features for ambitious projects.
 - [ ] **Account abstraction**: People often oppose MPC wallets with account abstractions, but they are complementary! We will combine them so you can abstract gas payment from your users, innovate on UX and add one more layer of protection, for example.

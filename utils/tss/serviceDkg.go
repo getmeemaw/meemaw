@@ -61,16 +61,15 @@ func (p *serviceDkg) Process() {
 }
 
 func (p *serviceDkg) OnStateChanged(oldState types.MainState, newState types.MainState) {
+
+	// log.Println("serviceDkg - State changed", "old", oldState.String(), "new", newState.String())
+
 	if newState == types.StateFailed {
 		log.Println("Dkg failed", "old", oldState.String(), "new", newState.String())
 		log.Println("closing done channel")
 		close(p.done)
 		return
 	} else if newState == types.StateDone {
-		// ATTENTION : concurrency problem => once either client or server has finished, he will close the connexion which might kill the last necessary message for the other one
-		// => for now, implemented 1sec delay before closing so that everything can finish correctly
-
-		// log.Println("Dkg done", "old", oldState.String(), "new", newState.String())
 		result, err := p.dkg.GetResult()
 		if err == nil {
 			p.result = result
@@ -81,8 +80,6 @@ func (p *serviceDkg) OnStateChanged(oldState types.MainState, newState types.Mai
 		close(p.done)
 		return
 	}
-
-	// log.Println("State changed", "old", oldState.String(), "new", newState.String())
 }
 
 type DKGResult struct {

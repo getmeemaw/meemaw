@@ -18,7 +18,6 @@ require (
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/rs/cors v1.7.0
 	golang.org/x/crypto v0.23.0
 	golang.org/x/mobile v0.0.0-20230922142353-e2f452493d57
 	google.golang.org/protobuf v1.34.1
