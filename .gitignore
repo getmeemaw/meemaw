@@ -21,3 +21,6 @@ test/integration/temp/temp
 /client/ios/meemaw/.build
 client/ios/meemaw/Tsslib.xcframework.zip
 /client/ios/meemaw/Tsslib.xcframework
+/client/ios/meemaw-ios/.build
+/client/ios/meemaw-ios/Tsslib.xcframework
+client/ios/meemaw-ios/Tsslib.xcframework.zip

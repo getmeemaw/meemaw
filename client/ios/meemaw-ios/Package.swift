@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "meemaw",
+    name: "meemaw-ios",
     platforms: [
         SupportedPlatform.iOS(.v13),
         SupportedPlatform.macOS(.v11)
     ],
     products: [
         .library(
-            name: "meemaw",
+            name: "meemaw-ios",
             targets: ["meemaw"]),
     ],
     dependencies: [
