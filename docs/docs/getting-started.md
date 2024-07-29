@@ -37,7 +37,7 @@ We will explain the Meemaw specific parts of this example in this page. The rest
 
 ## Deploy server
 
-You will learn a bit later how to [configure Meemaw](/docs/server#config) and modify the [Docker compose configuration](/docs/server#docker-compose) for your specific needs, but if you downloaded the example above, **there is just one thing you need to do**: in `server/config.toml`, update `supabaseUrl` and `supabaseApiKey` with yours.
+You will learn a bit later how to [configure Meemaw](/docs/server#config) and modify the [Docker compose configuration](/docs/server#docker-compose) for your specific needs, but if you downloaded the example above, **there is just one thing you need to do**: in `server/.env`, update `SUPABASE_URL` and `SUPABASE_API_KEY` with yours.
 
 Then you can actually deploy the server. **Make sure you're in the server directory and that Docker is running**, then just start the server with:
 

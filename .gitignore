@@ -24,3 +24,4 @@ client/ios/meemaw/Tsslib.xcframework.zip
 /client/ios/meemaw-ios/.build
 /client/ios/meemaw-ios/Tsslib.xcframework
 client/ios/meemaw-ios/Tsslib.xcframework.zip
+server/cmd/.env

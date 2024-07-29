@@ -9,6 +9,8 @@ Before moving any further on the Javascript SDK, one note of caution:
 :::info
 For now, **the Javascript SDK stores the client share of the wallet in LocalStorage**. Even though an attacker cannot do anything with the client share only (it requires the server share as well), LocalStorage does present security limitations. It is, for example, quite exposed to XSS attacks. There is also a risk for users to clear their cache and data, deleting the share and removing any access to the wallet.
 
+**It might not be as explicit on their websites, but our competitors use similar systems and are exposed to similar risks!** It's important for us that you understand the details.
+
 In the future, we will be using client-side encryption and/or authentication. We are considering two options:
 - Using client-side encryption : the TSS share is encrypted client side and stored on the server. This would solve both problems listed above. The problem is that the technology is not vastly supported yet. We're looking at WebAuthn with the PRF extension quite attentively.
 - Using client-side authentication : the TSS share is encrypted client side using a unique encryption key stored on the server. The encryption key is only provided to the client when properly authenticated (passkeys). This would reduce the risk of XSS attacks but it would not reduce the risk of users clearing their data.

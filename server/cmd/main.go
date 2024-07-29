@@ -11,6 +11,8 @@ import (
 	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/server/vault"
+	"github.com/getmeemaw/meemaw/utils/config"
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -35,7 +37,13 @@ func main() {
 	}
 
 	// load config
-	config, err := loadConfigFromFile("config.toml") // Update for args ?
+
+	// config, err := loadConfigFromFile("config.toml")
+	// if err != nil {
+	// 	log.Fatalf("Unable to load config: %v\n", err)
+	// }
+
+	config, err := loadConfigFromEnvs()
 	if err != nil {
 		log.Fatalf("Unable to load config: %v\n", err)
 	}
@@ -100,4 +108,39 @@ func loadConfigFromFile(path string) (*server.Config, error) {
 	}
 
 	return &config, nil
+}
+
+func loadConfigFromEnvs() (*server.Config, error) {
+	// Try to load from .env, if exists
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("No .env file found or error loading .env file: %v", err)
+	}
+
+	requiredVars := []string{
+		"DEV_MODE",
+		"PORT",
+		"DB_CONNECTION_URL",
+		"CLIENT_ORIGIN",
+		"AUTH_TYPE",
+		"AUTH_SERVER_URL",
+		"SUPABASE_URL",
+		"SUPABASE_API_KEY",
+	}
+
+	err = config.CheckRequiredEnvVars(requiredVars)
+	if err != nil {
+		return nil, err
+	}
+
+	return &server.Config{
+		DevMode:         config.GetEnvAsBool("DEV_MODE", false),
+		Port:            config.GetEnvAsInt("PORT", 9421),
+		DbConnectionUrl: os.Getenv("DB_CONNECTION_URL"), // Required, checked previously
+		ClientOrigin:    os.Getenv("CLIENT_ORIGIN"),
+		AuthType:        os.Getenv("AUTH_TYPE"),
+		AuthServerUrl:   os.Getenv("AUTH_SERVER_URL"),
+		SupabaseUrl:     os.Getenv("SUPABASE_URL"),
+		SupabaseApiKey:  os.Getenv("SUPABASE_API_KEY"),
+	}, nil
 }
