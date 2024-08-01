@@ -74,7 +74,7 @@ func (vault *Vault) StoreWallet(ctx context.Context, foreignKey string, peerID s
 	return hex.EncodeToString(clientKey), nil
 }
 
-// AddDevice adds a device in DB, including updating the BKs
+// AddPeer adds a device in DB, including updating the BKs
 // Requires the metadata in the context
 func (vault *Vault) AddPeer(ctx context.Context, foreignKey string, peerID string, userAgent string, updatedDkgResult *tss.DkgResult) error {
 	// get client key from context

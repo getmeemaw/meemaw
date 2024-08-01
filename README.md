@@ -103,10 +103,10 @@ var raw = {
 };
 
 // Sign the transaction
-const rawTransaction = await wallet.SignEthTransaction(raw, chainId);
+const signed = await wallet.SignEthTransaction(raw, chainId);
 
 // Send the signed transaction
-const txReceipt = await web3.eth.sendSignedTransaction(rawTransaction);
+const txReceipt = await web3.eth.sendSignedTransaction(signed);
 console.log("Look at my fabulous transaction:", txReceipt);
 
 ```
