@@ -13,7 +13,6 @@ import (
 	"github.com/getmeemaw/meemaw/server/vault"
 	"github.com/getmeemaw/meemaw/utils/config"
 	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -46,12 +45,14 @@ func main() {
 	config, err := loadConfigFromEnvs()
 	if err != nil {
 		log.Fatalf("Unable to load config: %v\n", err)
+		os.Exit(1)
 	}
 
 	// connect to DB
 	db, err := sql.Open("pgx", config.DbConnectionUrl)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -64,7 +65,8 @@ func main() {
 	// verify db connexion for good measure
 	_, err = queries.Status(context.Background())
 	if err != nil {
-		panic(errors.Wrap(err, "Error during PostgreSQL status"))
+		log.Fatalf("Error during db sttuse: %v\n", err)
+		os.Exit(1)
 	}
 	log.Println("Connected to DB")
 
@@ -75,6 +77,7 @@ func main() {
 		err = server.LoadSchema(db, "")
 		if err != nil {
 			log.Fatalf("Could not load schema: %s", err)
+			os.Exit(1)
 		} else {
 			log.Println("Schema loaded")
 		}
@@ -105,6 +108,7 @@ func loadConfigFromFile(path string) (*server.Config, error) {
 	var config server.Config
 	if err := toml.Unmarshal(bytes, &config); err != nil {
 		log.Fatalf("Failed to unmarshal configuration: %v", err)
+		os.Exit(1)
 	}
 
 	return &config, nil
