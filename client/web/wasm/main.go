@@ -208,7 +208,7 @@ func Export(this js.Value, args []js.Value) (any, error) {
 
 	privateKey, err := client.Export(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while signing:", err)
+		log.Println("error while exporting:", err)
 		return nil, err
 	}
 

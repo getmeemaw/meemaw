@@ -44,15 +44,22 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// WS connection
 
 	// Parse clientOrigin URL (to remove scheme from it)
-	u, err := url.Parse(server._config.ClientOrigin)
-	if err != nil {
-		log.Println("ClientOrigin wrongly configured")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+	var origin string
+	if server._config.ClientOrigin != "*" {
+		u, err := url.Parse(server._config.ClientOrigin)
+		if err != nil {
+			log.Println("ClientOrigin wrongly configured")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		origin = u.Host + u.Path
+	} else {
+		origin = "*"
 	}
 
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{u.Host + u.Path},
+		OriginPatterns: []string{origin},
 	})
 	if err != nil {
 		log.Println("DkgHandler - Error accepting websocket:", err)
