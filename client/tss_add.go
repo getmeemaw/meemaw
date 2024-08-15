@@ -41,6 +41,11 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
+		if resp == nil {
+			log.Println("error dialing websocket:", err)
+			return nil, "", err
+		}
+
 		if resp.StatusCode == 401 {
 			return nil, "", &types.ErrUnauthorized{}
 		} else if resp.StatusCode == 400 {
