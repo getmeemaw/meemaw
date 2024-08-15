@@ -353,7 +353,11 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
-		log.Println("error dialing websocket:", err)
+		if resp == nil {
+			log.Println("error dialing websocket:", err)
+			return err
+		}
+
 		if resp.StatusCode == 401 {
 			return &types.ErrUnauthorized{}
 		} else if resp.StatusCode == 400 {
