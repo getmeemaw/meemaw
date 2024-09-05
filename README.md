@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="https://influchain.fra1.digitaloceanspaces.com/static/img/grandma-transparent-purple.png" width="180px" />
+    <img src="https://getmeemaw.com/static/img/logo/grandma.webp" width="180px" />
 </p>
 
 <h1 align="center">Meemaw</h1>

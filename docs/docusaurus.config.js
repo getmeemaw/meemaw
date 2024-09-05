@@ -8,7 +8,7 @@ const darkCodeTheme = require('prism-react-renderer').themes.dracula;
 const config = {
   title: 'Meemaw - Docs',
   tagline: 'Grandma-friendly Wallet as a Service',
-  favicon: 'https://influchain.fra1.digitaloceanspaces.com/meemaw/static/img/logo/grandma-favicon.webp',
+  favicon: 'https://getmeemaw.com/static/img/logo/grandma-favicon.webp',
 
   // Set the production url of your site here
   url: 'https://getmeemaw.com',
@@ -63,12 +63,12 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
-      image: 'https://influchain.fra1.digitaloceanspaces.com/meemaw/static/img/logo/grandma-small.webp',
+      image: 'https://getmeemaw.com/static/img/logo/grandma-small.webp',
       navbar: {
         title: 'Meemaw',
         logo: {
           alt: 'Meemaw Logo',
-          src: 'https://influchain.fra1.digitaloceanspaces.com/meemaw/static/img/logo/grandma-small.webp',
+          src: 'https://getmeemaw.com/static/img/logo/grandma-small.webp',
           href: '/',
         },
         items: [
