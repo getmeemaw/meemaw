@@ -36,7 +36,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, "", authData)
 	if err != nil {
-		log.Println("error getting access token:", err)
+		log.Println("Dkg - error getting access token:", err)
 		return nil, "", err
 	}
 
@@ -45,14 +45,14 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	_hostHttp, err := urlToHttp(host)
 	if err != nil {
-		log.Println("error getting http host:", err)
+		log.Println("Dkg - error getting http host:", err)
 		return nil, "", err
 	}
 
 	// Check if wallet already exists
 	resp, err := http.Get(_hostHttp + path)
 	if err != nil {
-		log.Println("error dialing dkg (first call):", err)
+		log.Println("Dkg - error dialing server /dkg (first call):", err)
 		return nil, "", err
 	}
 
@@ -63,19 +63,19 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	} else if resp.StatusCode == 404 {
 		return nil, "", &types.ErrNotFound{}
 	} else if resp.StatusCode == 409 {
-		log.Println("existing wallet")
+		log.Println("Dkg - error: existing wallet")
 		return nil, "", &types.ErrConflict{}
 	} else if resp.StatusCode == 426 {
-		log.Println("no existing wallet")
+		log.Println("Dkg - no existing wallet")
 	} else {
-		log.Println("error dialing dkg (first call):", err)
-		return nil, "", errors.New("error dialing dkg (first call)")
+		log.Println("Dkg - unknown behavior")
+		return nil, "", errors.New("Dkg - unknown behavior")
 	}
 	defer resp.Body.Close()
 
 	_host, err := urlToWs(host)
 	if err != nil {
-		log.Println("error getting ws host:", err)
+		log.Println("Dkg - error getting ws host:", err)
 		return nil, "", err
 	}
 
@@ -87,6 +87,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	dkg, err := tss.NewClientDkg(peerID)
 	if err != nil {
+		log.Println("Dkg - error creating new client dkg:", err)
 		return nil, "", err
 	}
 
@@ -95,7 +96,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	c, _, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
-		log.Println("error dialing websocket:", err)
+		log.Println("Dkg - error dialing websocket:", err)
 		return nil, "", err
 	}
 	defer c.Close(websocket.StatusInternalError, "the sky is falling")
@@ -121,47 +122,47 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 
 	go func() {
 		for {
-			log.Println("Dkg - wsjson.Read")
+			// log.Println("Dkg - wsjson.Read")
 			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
 				if ctx.Err() == context.Canceled {
-					log.Println("read operation canceled")
+					// log.Println("Dkg - read operations canceled")
 					return
 				}
 
 				// Check if the WebSocket was closed normally
 				closeStatus := websocket.CloseStatus(err)
 				if closeStatus == websocket.StatusNormalClosure || closeStatus == websocket.StatusGoingAway {
-					log.Println("WebSocket closed normally")
+					// log.Println("Dkg - WebSocket closed normally")
 					return
 				}
 
 				// Handle other errors
 				log.Println("Dkg - error reading message from websocket:", err)
-				log.Println("websocket.CloseStatus(err):", closeStatus)
+				log.Println("Dkg - websocket.CloseStatus(err):", closeStatus)
 				errs <- err
 				return
 			}
 
-			log.Println("received message in Dkg:", msg)
+			// log.Println("received message in Dkg:", msg)
 
 			switch msg.Type {
 			case ws.TssMessage:
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("Dkg - error: received TSS message but we're at later stage; stage:", stage)
 					continue
 				}
 
-				log.Println("Dkg - received tss message:", msg)
+				// log.Println("Dkg - received tss message:", msg)
 
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
 				if err != nil {
-					log.Println("error decoding hex:", err)
+					log.Println("Dkg - error decoding hex (tss message):", err)
 					errs <- err
 					return
 				}
@@ -169,22 +170,22 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				tssMsg := &tss.Message{}
 				err = json.Unmarshal(byteString, &tssMsg)
 				if err != nil {
-					log.Println("could not unmarshal tss msg:", err)
+					log.Println("Dkg - could not unmarshal tss msg:", err)
 					errs <- err
 					return
 				}
 
-				log.Println("Dkg - trying to handle tssMsg:", tssMsg)
+				// log.Println("Dkg - trying to handle tssMsg:", tssMsg)
 
 				// Handle tss message (NOTE : will automatically, in ServerAdd.HandleMessage, redirect to other client if needs be)
 				err = dkg.HandleMessage(tssMsg)
 				if err != nil {
-					log.Println("could not handle tss msg:", err)
+					log.Println("Dkg - error while handling tss msg:", err)
 					errs <- err
 					return
 				}
 
-				log.Println("Dkg - tssMsg handled")
+				// log.Println("Dkg - tssMsg handled")
 
 			case ws.MetadataMessage:
 				// note : have a timer somewhere, if after X seconds we don't have this message, then it means the process failed.
@@ -192,7 +193,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				// update metadata to return it at the end
 				metadata = string(msg.Msg)
 
-				log.Println("Dkg - received metadata (=> sending metadataAck):", metadata)
+				// log.Println("Dkg - received metadata (=> sending metadataAck):", metadata)
 
 				//
 
@@ -211,11 +212,11 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 				close(serverDone)
 
 			default:
-				log.Println("Unexpected message type:", msg.Type)
+				log.Println("Dkg - Unexpected message type:", msg.Type)
 				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
-					log.Println("RegisterDevice - errorMsg - error writing json through websocket:", err)
+					log.Println("Dkg - errorMsg - error writing json through websocket:", err)
 					errs <- err
 					return
 				}
@@ -229,12 +230,12 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// Start adder
 	dkgResult, err := dkg.Process()
 	if err != nil {
-		log.Println("error processing adder:", err)
+		log.Println("Dkg - error processing adder:", err)
 		errs <- err
 		return nil, "", nil
 	}
 
-	log.Println("Dkg process finished")
+	// log.Println("Dkg process finished")
 
 	// Error management
 	err = ws.ProcessErrors(errs, ctx, c, "Dkg")
@@ -253,7 +254,7 @@ func Dkg(host, authData string) (*tss.DkgResult, string, error) {
 	// time.Sleep(2000 * time.Millisecond)
 	cancel()
 
-	log.Println("Dkg serverDone")
+	// log.Println("Dkg serverDone")
 
 	// CLOSE WEBSOCKET
 	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
@@ -268,14 +269,14 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
-		log.Println("error getting access token:", err)
+		log.Println("Sign - error getting access token:", err)
 		return nil, &types.ErrUnauthorized{}
 	}
 
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
-		log.Println("error unmarshaling signingParameters:", err)
+		log.Println("Sign - error unmarshaling signingParameters:", err)
 		return nil, &types.ErrBadRequest{}
 	}
 
@@ -290,7 +291,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 
 	_host, err := urlToWs(host)
 	if err != nil {
-		log.Println("error getting ws host:", err)
+		log.Println("Sign - error getting ws host:", err)
 		return nil, &types.ErrBadRequest{}
 	}
 
@@ -300,7 +301,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
 		if resp == nil {
-			log.Println("error dialing websocket:", err)
+			log.Println("Sign - error dialing websocket:", err)
 			return nil, err
 		}
 
@@ -313,7 +314,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 		} else if resp.StatusCode == 409 {
 			return nil, &types.ErrConflict{}
 		} else {
-			log.Println("error dialing websocket:", err)
+			log.Println("Sign - error dialing websocket:", err)
 			return nil, err
 		}
 	}
@@ -321,7 +322,7 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 
 	signer, err := tss.NewClientSigner(clientPeerID, pubkeyStr, share, BKs, message)
 	if err != nil {
-		log.Println("error when getting new client signer:", err)
+		log.Println("Sign - error when getting new client signer:", err)
 		return nil, &types.ErrBadRequest{}
 	}
 
@@ -333,20 +334,20 @@ func Sign(host string, message []byte, dkgResultStr string, metadata string, aut
 	// Start signing process
 	signature, err := signer.Process()
 	if err != nil {
-		log.Println("error processing signing:", err)
+		log.Println("Sign - error processing signing:", err)
 		return nil, &types.ErrTssProcessFailed{}
 	}
 
 	// Error management
 	processErr := <-errs // wait for websocket closure from server
 	if ctx.Err() == context.Canceled {
-		log.Println("websocket closed by context cancellation:", processErr)
+		log.Println("Sign - websocket closed by context cancellation:", processErr)
 		return nil, processErr
 	} else if websocket.CloseStatus(processErr) == websocket.StatusNormalClosure {
-		log.Println("websocket closed normally")
+		// log.Println("Sign - websocket closed normally")
 		cancel()
 	} else {
-		log.Println("error during websocket connection:", processErr) // even if badly closed, we continue as we have the signature
+		log.Println("Sign - error during websocket connection:", processErr) // even if badly closed, we continue as we have the signature
 		cancel()
 	}
 
@@ -364,7 +365,7 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
-		log.Println("error getting access token:", err)
+		log.Println("Export - error getting access token:", err)
 		return "", &types.ErrUnauthorized{}
 	}
 
@@ -373,7 +374,7 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 
 	_host, err := urlToHttp(host)
 	if err != nil {
-		log.Println("error getting ws host:", err)
+		log.Println("Export - error getting ws host:", err)
 		return "", &types.ErrBadRequest{}
 	}
 
@@ -381,7 +382,7 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
-		log.Println("error unmarshaling signingParameters:", err)
+		log.Println("Export - error unmarshaling signingParameters:", err)
 		return "", &types.ErrBadRequest{}
 	}
 
@@ -397,7 +398,7 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 	// Send POST request
 	resp, err := http.PostForm(_host+path, formData)
 	if err != nil {
-		fmt.Println("Error sending request:", err)
+		fmt.Println("Export - error sending request:", err)
 		return "", &types.ErrBadRequest{}
 	}
 	defer resp.Body.Close()
@@ -405,7 +406,7 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("Error reading response body:", err)
+		log.Println("Export - error reading response body:", err)
 		return "", &types.ErrBadRequest{}
 	}
 
@@ -429,7 +430,7 @@ func getAuthDataFromServer(host, authData, metadata, endpoint string) (string, e
 	// Request access token
 	req, err := http.NewRequest("GET", _host+endpoint, nil)
 	if err != nil {
-		log.Println("error while creating new request:", err)
+		log.Println("getAuthDataFromServer - error while creating new request:", err)
 		return "", err
 	}
 
@@ -438,20 +439,20 @@ func getAuthDataFromServer(host, authData, metadata, endpoint string) (string, e
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Println("error while doing request to", endpoint, ":", err)
+		log.Println("getAuthDataFromServer - error while doing request to", endpoint, ":", err)
 		return "", err
 	}
 
 	if resp.StatusCode != 200 {
-		log.Println("error while", endpoint, ", status not 200")
-		log.Printf("resp:%+v\n", resp)
+		log.Println("getAuthDataFromServer - error while", endpoint, ", status not 200")
+		log.Printf("getAuthDataFromServer - resp:%+v\n", resp)
 		return "", fmt.Errorf(endpoint, " status not 200")
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("error while reading response body of", endpoint, ":", err)
+		log.Println("getAuthDataFromServer - error while reading response body of", endpoint, ":", err)
 		return "", err
 	}
 	retValue := string(body)

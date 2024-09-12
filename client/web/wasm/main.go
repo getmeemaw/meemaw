@@ -46,7 +46,7 @@ func Identify(this js.Value, args []js.Value) (any, error) {
 
 	userId, err := client.Identify(host, authData)
 	if err != nil {
-		log.Println("error while getting userId:", err)
+		log.Println("Identify - error while getting userId:", err)
 		return nil, err
 	}
 
@@ -66,7 +66,7 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 
 	dkgResult, metadata, err := client.Dkg(host, authData)
 	if err != nil {
-		log.Println("error while dkg:", err)
+		log.Println("Dkg - error while dkg:", err)
 		return nil, err
 	}
 
@@ -77,7 +77,7 @@ func Dkg(this js.Value, args []js.Value) (any, error) {
 
 	respJSON, err := json.Marshal(resp)
 	if err != nil {
-		log.Println("error while marshaling dkgresult json:", err)
+		log.Println("Dkg - error while marshaling dkgresult json:", err)
 		return nil, err
 	}
 
@@ -92,7 +92,7 @@ func RegisterDevice(this js.Value, args []js.Value) (any, error) {
 
 	dkgResult, metadata, err := client.RegisterDevice(host, authData, "web")
 	if err != nil {
-		log.Println("error while registerDevice:", err)
+		log.Println("RegisterDevice - error while registerDevice:", err)
 		return nil, err
 	}
 
@@ -103,7 +103,7 @@ func RegisterDevice(this js.Value, args []js.Value) (any, error) {
 
 	respJSON, err := json.Marshal(resp)
 	if err != nil {
-		log.Println("error while marshaling dkgresult json:", err)
+		log.Println("RegisterDevice - error while marshaling dkgresult json:", err)
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func AcceptDevice(this js.Value, args []js.Value) (any, error) {
 
 	err := client.AcceptDevice(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while acceptDevice:", err)
+		log.Println("AcceptDevice - error while acceptDevice:", err)
 		return nil, err
 	}
 
@@ -137,7 +137,7 @@ func Backup(this js.Value, args []js.Value) (any, error) {
 
 	backup, err := client.Backup(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while Backup:", err)
+		log.Println("Backup - error while Backup:", err)
 		return nil, err
 	}
 
@@ -153,7 +153,7 @@ func FromBackup(this js.Value, args []js.Value) (any, error) {
 
 	dkgResult, metadata, err := client.FromBackup(host, backup, authData)
 	if err != nil {
-		log.Println("error while Backup:", err)
+		log.Println("FromBackup - error while Backup:", err)
 		return nil, err
 	}
 
@@ -183,13 +183,13 @@ func SignBytes(this js.Value, args []js.Value) (any, error) {
 	trimmedHexEncodedMsg := strings.TrimPrefix(strings.TrimSuffix(strings.ReplaceAll(hexEncodedMsg, "\"", ""), "\n"), "0x")
 	message, err := hex.DecodeString(trimmedHexEncodedMsg)
 	if err != nil {
-		log.Println("error while hex decoding message:", err)
+		log.Println("SignBytes - error while hex decoding message:", err)
 		return nil, err
 	}
 
 	signature, err := client.Sign(host, message, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while signing:", err)
+		log.Println("SignBytes - error while signing:", err)
 		return nil, err
 	}
 
@@ -208,7 +208,7 @@ func Export(this js.Value, args []js.Value) (any, error) {
 
 	privateKey, err := client.Export(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while exporting:", err)
+		log.Println("Export - error while exporting:", err)
 		return nil, err
 	}
 
@@ -219,8 +219,8 @@ func Export(this js.Value, args []js.Value) (any, error) {
 // output : signed message, error
 func SignEthTransaction(this js.Value, args []js.Value) (any, error) {
 	if len(args) != 6 {
-		log.Println("error when SignEthTransaction: not the correct number of arguments")
-		return nil, fmt.Errorf("not the correct number of arguments")
+		log.Println("SignEthTransaction - error: incorrect number of arguments")
+		return nil, fmt.Errorf("incorrect number of arguments")
 	}
 
 	host := args[0].String()
@@ -233,7 +233,7 @@ func SignEthTransaction(this js.Value, args []js.Value) (any, error) {
 
 	_tx, err := tx.NewEthereumTxWithJson(jsonEncodedTx, chainId)
 	if err != nil {
-		log.Println("error while initialising tx:", err)
+		log.Println("SignEthTransaction - error while initialising tx:", err)
 		return nil, err
 	}
 
@@ -241,7 +241,7 @@ func SignEthTransaction(this js.Value, args []js.Value) (any, error) {
 
 	signature, err := client.Sign(host, message, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while signing:", err)
+		log.Println("SignEthTransaction - error while signing:", err)
 		return nil, err
 	}
 

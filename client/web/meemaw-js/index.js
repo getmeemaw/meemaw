@@ -28,7 +28,7 @@ export class Wallet {
         try {
             signedTx = await window.SignEthTransaction(this.host, JSON.stringify(raw), this.dkgResult, this.metadata, this.authData, String(chainId));
         } catch (error) {
-            console.log("error while signing tx:", error)
+            console.error("SignEthTransaction - error:", error)
             throw error;
         }
 
@@ -47,7 +47,7 @@ export class Wallet {
         try {
             signature = await window.SignBytes(this.host, raw, this.dkgResult, this.metadata, this.authData);
         } catch (error) {
-            console.log("error while signing tx:", error)
+            console.error("SignBytes - error:", error)
             throw error;
         }
 
@@ -62,7 +62,7 @@ export class Wallet {
         try {
             privateKey = await window.Export(this.host, this.dkgResult, this.metadata, this.authData);
         } catch (error) {
-            console.log("error while exporting private key:", error)
+            console.error("Export - error:", error)
             throw error;
         }
 
@@ -74,7 +74,7 @@ export class Wallet {
         try {
             await window.AcceptDevice(this.host, this.dkgResult, this.metadata, this.authData);
         } catch (error) {
-            console.log("error while accepting device:", error)
+            console.error("AcceptDevice - error:", error)
             throw error;
         }
     }
@@ -84,7 +84,7 @@ export class Wallet {
         try {
             return await window.Backup(this.host, this.dkgResult, this.metadata, this.authData);
         } catch (error) {
-            console.log("error while accepting device:", error)
+            console.error("Backup - error:", error)
             throw error;
         }
     }
@@ -107,7 +107,7 @@ export default class Meemaw {
         const go = new Go();
         const wasmModule = await WebAssembly.instantiateStreaming(fetch(wasmUrl), go.importObject);
         go.run(wasmModule.instance);
-        console.log("wasm loaded");
+        // console.log("wasm loaded");
         return new Meemaw(serverUrl, wasmModule, go);
     }
 
@@ -122,7 +122,7 @@ export default class Meemaw {
         try {
             userId = await window.Identify(this.host, authData)
         } catch (error) {
-            console.log("error getting userId:", error)
+            console.error("GetWallet - error getting userId:", error)
             throw error;
         }
 
@@ -133,32 +133,32 @@ export default class Meemaw {
 
         // If it does, return the wallet
         if (storedDkgResult !== null && storedAddress !== null) {
-            console.log("Loading existing wallet")
+            console.log("GetWallet - loading existing wallet")
             return new Wallet(this.host, storedDkgResult, storedMetadata, storedAddress, authData);
         }
 
         // Try DKG
         try {
-            console.log("trying DKG")
+            console.log("GetWallet - starting Dkg")
             const resp = await window.Dkg(this.host, authData);
-            console.log("got DKG resp:", resp)
+            // console.log("got DKG resp:", resp)
             const parsedResp = JSON.parse(resp);
             const newDkgResult = JSON.stringify(parsedResp.dkgResult);
 
             this.storeDkgResults(userId, newDkgResult, parsedResp.dkgResult.Address, parsedResp.metadata);
             return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
         } catch (err) {
-            console.log("Error while DKG:", err)
+            // console.error("GetWallet - error while DKG:", err)
             if (err instanceof Error) {    
                 // Check for specific error messages or properties
                 if (err.message === "conflict") {
-                    console.log("Wallet already exists on server side. Registering device.");
+                    console.log("GetWallet - wallet already exists on server side. Registering device.");
                 } else {
-                    console.log("error while dkg:", err.message);
+                    console.error("GetWallet - error while dkg:", err.message);
                     throw err;
                 }
             } else {
-                console.error("Got error while DKG. Unknown error type:", err);
+                console.error("GetWallet - unknown error while dkg:", err);
                 throw err;
             }
         }
@@ -184,7 +184,7 @@ export default class Meemaw {
 
             return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
         } catch(error) {
-            console.log("error while registering device:", error)
+            console.error("GetWallet - error while registering device:", error)
             throw error;
         }
     }
@@ -200,7 +200,7 @@ export default class Meemaw {
         try {
             userId = await window.Identify(this.host, authData)
         } catch (error) {
-            console.log("error getting userId:", error)
+            console.error("GetWalletFromBackup - error getting userId:", error)
             throw error;
         }
 
@@ -213,7 +213,7 @@ export default class Meemaw {
 
             return new Wallet(this.host, newDkgResult, parsedResp.metadata, parsedResp.dkgResult.Address, authData);
         } catch(error) {
-            console.log("error while getting wallet from backup:", error)
+            console.error("GetWalletFromBackup - error while getting wallet from backup:", error)
             throw error;
         }
     }

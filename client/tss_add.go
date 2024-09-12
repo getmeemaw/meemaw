@@ -21,7 +21,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, "", authData)
 	if err != nil {
-		log.Println("error getting access token:", err)
+		log.Println("RegisterDevice - error getting access token:", err)
 		return nil, "", err
 	}
 
@@ -30,7 +30,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	_host, err := urlToWs(host)
 	if err != nil {
-		log.Println("error getting ws host:", err)
+		log.Println("RegisterDevice - error getting ws host:", err)
 		return nil, "", err
 	}
 
@@ -42,7 +42,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
 		if resp == nil {
-			log.Println("error dialing websocket:", err)
+			log.Println("RegisterDevice - error dialing websocket:", err)
 			return nil, "", err
 		}
 
@@ -55,7 +55,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 		} else if resp.StatusCode == 409 {
 			return nil, "", &types.ErrConflict{}
 		} else {
-			log.Println("error dialing websocket:", err)
+			log.Println("RegisterDevice - error dialing websocket:", err)
 			return nil, "", err
 		}
 	}
@@ -86,20 +86,20 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 
 	go func() {
 		for {
-			log.Println("RegisterDevice - wsjson.Read")
+			// log.Println("RegisterDevice - wsjson.Read")
 			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
 				if ctx.Err() == context.Canceled {
-					log.Println("read operation canceled")
+					// log.Println("RegisterDevice - read operation canceled")
 					return
 				}
 
 				// Check if the WebSocket was closed normally
 				closeStatus := websocket.CloseStatus(err)
 				if closeStatus == websocket.StatusNormalClosure || closeStatus == websocket.StatusGoingAway {
-					log.Println("WebSocket closed normally")
+					// log.Println("RegisterDevice - WebSocket closed normally")
 					return
 				}
 
@@ -110,13 +110,13 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				return
 			}
 
-			log.Println("RegisterDevice - received message:", msg)
+			// log.Println("RegisterDevice - received message:", msg)
 
 			switch msg.Type {
 			case ws.PeerIdBroadcastMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("Device message but we're at later stage; stage:", stage)
+					log.Println("RegisterDevice - Device message received but we're at later stage; stage:", stage)
 					continue
 				}
 
@@ -137,11 +137,11 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 			case ws.PubkeyMessage:
 				// Recover pubkey & BKs from message
 
-				log.Println("RegisterDevice - received pubkey message.")
+				// log.Println("RegisterDevice - received pubkey message.")
 
 				data, err := hex.DecodeString(msg.Msg)
 				if err != nil {
-					log.Println("error decoding publicWallet:", err)
+					log.Println("RegisterDevice - error decoding publicWallet:", err)
 					errs <- err
 					return
 				}
@@ -149,13 +149,13 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				var publicWallet server.PublicWallet
 				err = json.Unmarshal(data, &publicWallet)
 				if err != nil {
-					log.Println("error unmarshaling publicWallet:", err)
+					log.Println("RegisterDevice - error unmarshaling publicWallet:", err)
 					errs <- err
 					return
 				}
 
-				log.Println("RegisterDevice - received pubkey public wallet:", publicWallet)
-				log.Println("RegisterDevice - creating adder")
+				// log.Println("RegisterDevice - received pubkey public wallet:", publicWallet)
+				// log.Println("RegisterDevice - creating adder")
 
 				// Create adder
 				adder, err = tss.NewClientAdd(peerID, acceptingDevicePeerID, publicWallet.PublicKey, publicWallet.BKs)
@@ -165,7 +165,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 					return
 				}
 
-				log.Println("RegisterDevice - startTss<-")
+				// log.Println("RegisterDevice - startTss<-")
 
 				// start message handling of tss process & adder.process
 				startTss <- struct{}{}
@@ -185,16 +185,16 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("RegisterDevice - TSS message received but we're at later stage; stage:", stage)
 					continue
 				}
 
-				log.Println("RegisterDevice - received tss message")
+				// log.Println("RegisterDevice - received tss message")
 
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
 				if err != nil {
-					log.Println("error decoding hex:", err)
+					log.Println("RegisterDevice - error decoding hex of tss message:", err)
 					errs <- err
 					return
 				}
@@ -202,17 +202,17 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				tssMsg := &tss.Message{}
 				err = json.Unmarshal(byteString, &tssMsg)
 				if err != nil {
-					log.Println("could not unmarshal tss msg:", err)
+					log.Println("RegisterDevice - could not unmarshal tss msg:", err)
 					errs <- err
 					return
 				}
 
-				log.Println("RegisterDevice - trying to handle tssMsg:", tssMsg)
+				// log.Println("RegisterDevice - trying to handle tssMsg:", tssMsg)
 
 				// Handle tss message (NOTE : will automatically, in ServerAdd.HandleMessage, redirect to other client if needs be)
 				err = adder.HandleMessage(tssMsg)
 				if err != nil {
-					log.Println("could not handle tss msg:", err)
+					log.Println("RegisterDevice - error while handling tss msg:", err)
 					errs <- err
 					return
 				}
@@ -223,7 +223,7 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				// update metadata to return it at the end
 				metadata = string(msg.Msg)
 
-				log.Println("RegisterDevice - received metadata (=> sending metadataAck):", metadata)
+				// log.Println("RegisterDevice - received metadata (=> sending metadataAck):", metadata)
 
 				// SEND EverythingStoredClientMessage
 				ack := ws.Message{
@@ -241,17 +241,17 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("RegisterDevice - Existing device done message but we're at later stage; stage:", stage)
 					continue
 				}
 
-				log.Println("RegisterDevice - received ExistingDeviceDoneMessage")
+				// log.Println("RegisterDevice - received ExistingDeviceDoneMessage")
 
 				// Stop process
 				close(serverDone)
 
 			default:
-				log.Println("Unexpected message type:", msg.Type)
+				log.Println("RegisterDevice - Unexpected message type:", msg.Type)
 				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
@@ -267,28 +267,28 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	<-startTss
 
 	// Get channel from adder /!\ needs to be initialised first => this line needs to be after <-startTss
-	log.Println("RegisterDevice - trying to GetDoneChan()")
+	// log.Println("RegisterDevice - trying to GetDoneChan()")
 	tssDone := adder.GetDoneChan()
 
 	// TSS sending and listening for finish signal
 	go ws.TssSend(adder.GetNextMessageToSendAll, serverDone, errs, ctx, c, "RegisterDevice")
 
-	log.Println("RegisterDevice - start process")
+	// log.Println("RegisterDevice - start process")
 
 	// Start adder
 	dkgResult, err := adder.Process()
 	if err != nil {
-		log.Println("error processing adder:", err)
+		log.Println("RegisterDevice - error processing adder:", err)
 		errs <- err
 		return nil, "", nil
 	}
 
-	log.Println("RegisterDevice process finished")
+	// log.Println("RegisterDevice process finished")
 
 	// start finishing steps after tss process => sending metadata
 	<-tssDone
 
-	log.Println("RegisterDevice tssDone")
+	// log.Println("RegisterDevice tssDone")
 
 	// Error management
 	err = ws.ProcessErrors(errs, ctx, c, "RegisterDevice")
@@ -307,10 +307,10 @@ func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, erro
 	// time.Sleep(2000 * time.Millisecond)
 	cancel()
 
-	log.Println("RegisterDevice serverDone")
+	// log.Println("RegisterDevice serverDone")
 
 	// CLOSE WEBSOCKET
-	c.Close(websocket.StatusNormalClosure, "dkg process finished successfully")
+	c.Close(websocket.StatusNormalClosure, "Registering process finished successfully")
 
 	return dkgResult, metadata, nil // UPDATE
 }
@@ -325,7 +325,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	// Get temporary access token from server based on auth data
 	token, err := getAccessToken(host, metadata, authData)
 	if err != nil {
-		log.Println("error getting access token:", err)
+		log.Println("AcceptDevice - error getting access token:", err)
 		return err
 	}
 
@@ -333,7 +333,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
-		log.Println("error unmarshaling dkgResult:", err)
+		log.Println("AcceptDevice - error unmarshaling dkgResult:", err)
 		return err
 	}
 
@@ -342,7 +342,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	_host, err := urlToWs(host)
 	if err != nil {
-		log.Println("error getting ws host:", err)
+		log.Println("AcceptDevice - error getting ws host:", err)
 		return err
 	}
 
@@ -354,7 +354,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	c, resp, err := websocket.Dial(ctx, _host+path, nil)
 	if err != nil {
 		if resp == nil {
-			log.Println("error dialing websocket:", err)
+			log.Println("AcceptDevice - error dialing websocket:", err)
 			return err
 		}
 
@@ -378,7 +378,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	var stage uint32 = 0
 
-	log.Println("sending metadata from acceptDevice:", metadata)
+	// log.Println("AcceptDevice - sending metadata from acceptDevice:", metadata)
 
 	peerID := dkgResult.PeerID
 	var newClientPeerID string
@@ -394,24 +394,24 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 		return err
 	}
 
-	log.Println("metadata sent from acceptDevice")
+	// log.Println("AcceptDevice - metadata sent from acceptDevice")
 
 	go func() {
 		for {
-			log.Println("AcceptDevice - wsjson.Read")
+			// log.Println("AcceptDevice - wsjson.Read")
 			var msg ws.Message
 			err := wsjson.Read(ctx, c, &msg)
 			if err != nil {
 				// Check if the context was canceled
 				if ctx.Err() == context.Canceled {
-					log.Println("read operation canceled")
+					// log.Println("AcceptDevice - read operation canceled")
 					return
 				}
 
 				// Check if the WebSocket was closed normally
 				closeStatus := websocket.CloseStatus(err)
 				if closeStatus == websocket.StatusNormalClosure || closeStatus == websocket.StatusGoingAway {
-					log.Println("WebSocket closed normally")
+					// log.Println("AcceptDevice - WebSocket closed normally")
 					return
 				}
 
@@ -422,13 +422,13 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				return
 			}
 
-			log.Println("AcceptDevice - received message:", msg)
+			// log.Println("AcceptDevice - received message:", msg)
 
 			switch msg.Type {
 			case ws.PeerIdBroadcastMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("Device message but we're at later stage; stage:", stage)
+					log.Println("AcceptDevice - Device message received but we're at later stage; stage:", stage)
 					continue
 				}
 
@@ -449,7 +449,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 			case ws.MetadataAckMessage:
 				// Create adder
 
-				log.Println("AcceptDevice - creating adder")
+				// log.Println("AcceptDevice - creating adder")
 
 				adder, err = tss.NewExistingClientAdd(newClientPeerID, peerID, dkgResult.Pubkey, dkgResult.Share, dkgResult.BKs)
 				if err != nil {
@@ -458,7 +458,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 					return
 				}
 
-				log.Println("AcceptDevice - startTss<-")
+				// log.Println("AcceptDevice - startTss<-")
 
 				// start message handling of tss process & adder.process
 				startTss <- struct{}{}
@@ -466,14 +466,14 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("AcceptDevice - TSS message received but we're at later stage; stage:", stage)
 					continue
 				}
 
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
 				if err != nil {
-					log.Println("error decoding hex:", err)
+					log.Println("AcceptDevice - error decoding hex of tss message:", err)
 					errs <- err
 					return
 				}
@@ -481,17 +481,17 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				tssMsg := &tss.Message{}
 				err = json.Unmarshal(byteString, &tssMsg)
 				if err != nil {
-					log.Println("could not unmarshal tss msg:", err)
+					log.Println("AcceptDevice - could not unmarshal tss msg:", err)
 					errs <- err
 					return
 				}
 
-				log.Println("AcceptDevice - trying to handle tssMsg:", tssMsg)
+				// log.Println("AcceptDevice - trying to handle tssMsg:", tssMsg)
 
 				// Handle tss message
 				err = adder.HandleMessage(tssMsg)
 				if err != nil {
-					log.Println("could not handle tss msg:", err)
+					log.Println("AcceptDevice - could not handle tss msg:", err)
 					errs <- err
 					return
 				}
@@ -499,11 +499,11 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 			case ws.NewDeviceDoneMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("AcceptDevice - NewDeviceDone message but we're at later stage; stage:", stage)
 					continue
 				}
 
-				log.Println("AcceptDevice - received NewDeviceDoneMessage")
+				// log.Println("AcceptDevice - received NewDeviceDoneMessage")
 
 				existingDeviceDoneMsg := ws.Message{
 					Type: ws.ExistingDeviceDoneMessage,
@@ -511,17 +511,17 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 				}
 				err = wsjson.Write(ctx, c, existingDeviceDoneMsg)
 				if err != nil {
-					log.Println("error writing json through websocket:", err)
+					log.Println("AcceptDevice - error writing json through websocket:", err)
 					errs <- err // UPDATE !!
 					return
 				}
 
-				log.Println("AcceptDevice - closing serverDone")
+				// log.Println("AcceptDevice - closing serverDone")
 
 				close(serverDone)
 
 			default:
-				log.Println("Unexpected message type:", msg.Type)
+				log.Println("AcceptDevice - Unexpected message type:", msg.Type)
 				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
@@ -537,28 +537,29 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	<-startTss
 
 	// Get channel from adder /!\ needs to be initialised first => this line needs to be after <-startTss
-	log.Println("AcceptDevice - trying to GetDoneChan()")
+	// log.Println("AcceptDevice - trying to GetDoneChan()")
 	tssDone := adder.GetDoneChan()
 
 	// TSS sending and listening for finish signal
 	go ws.TssSend(adder.GetNextMessageToSendAll, serverDone, errs, ctx, c, "AcceptDevice")
 
-	log.Println("AcceptDevice - start process")
+	// log.Println("AcceptDevice - start process")
 
 	// Start adder
-	newDkgResult, err := adder.Process() // UPDATE RETURN
+	// newDkgResult, err := adder.Process() // UPDATE RETURN
+	_, err = adder.Process() // UPDATE RETURN
 	if err != nil {
-		log.Println("error processing adder:", err)
+		log.Println("AcceptDevice - error processing adder:", err)
 		errs <- err
 		return nil
 	}
 
-	log.Println("AcceptDevice - process done")
+	// log.Println("AcceptDevice - process done")
 
 	// start finishing steps after tss process => sending metadata
 	<-tssDone
 
-	log.Println("AcceptDevice - tssDone")
+	// log.Println("AcceptDevice - tssDone")
 
 	// Error management
 	err = ws.ProcessErrors(errs, ctx, c, "AcceptDevice")
@@ -569,7 +570,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	stage = 40 // only move to next stage after tss process is done
 
-	log.Println("AcceptDevice - sending TssDoneMessage")
+	// log.Println("AcceptDevice - sending TssDoneMessage")
 
 	// Send tss done message
 	existingDeviceDoneMsg := ws.Message{
@@ -578,7 +579,7 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 	}
 	err = wsjson.Write(ctx, c, existingDeviceDoneMsg)
 	if err != nil {
-		log.Println("error writing json through websocket:", err)
+		log.Println("AcceptDevice - error writing json through websocket:", err)
 		return err
 	}
 
@@ -586,12 +587,12 @@ func AcceptDevice(host string, dkgResultStr string, metadata string, authData st
 
 	cancel()
 
-	log.Println("AcceptDevice serverDone")
+	// log.Println("AcceptDevice serverDone")
 
-	log.Println("")
+	// log.Println("")
 
-	log.Println("AcceptDevice - old dkgResult:", dkgResult)
-	log.Println("AcceptDevice - new dkgResult:", newDkgResult)
+	// log.Println("AcceptDevice - old dkgResult:", dkgResult)
+	// log.Println("AcceptDevice - new dkgResult:", newDkgResult)
 
 	// Timer to verify that we get what we need from client ? if not, remove stuff if we need to.
 
@@ -620,10 +621,10 @@ func backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, stri
 	var err error
 
 	go func() {
-		log.Println("Backup - starting registerDevice")
+		// log.Println("Backup - starting registerDevice")
 		dkgResultNewClient, metadataNewClient, err = RegisterDevice(host, authData, "backup")
 		if err != nil {
-			log.Println("Error registerDevice:", err)
+			log.Println("Backup - error registerDevice:", err)
 			return
 		}
 
@@ -632,15 +633,15 @@ func backup(host, dkgResultStr, metadata, authData string) (*tss.DkgResult, stri
 
 	time.Sleep(50 * time.Millisecond)
 
-	log.Println("Backup - starting acceptDevice")
+	// log.Println("Backup - starting acceptDevice")
 
 	err = AcceptDevice(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("Error acceptDevice:", err)
+		log.Println("Backup - error acceptDevice:", err)
 		return nil, "", err
 	}
 
-	log.Println("client.Backup done")
+	// log.Println("client.Backup done")
 
 	<-newClientDone
 
@@ -651,13 +652,13 @@ func Backup(host, dkgResultStr, metadata, authData string) (string, error) {
 
 	backupDkgResult, backupMetadata, err := backup(host, dkgResultStr, metadata, authData)
 	if err != nil {
-		log.Println("error while Backup:", err)
+		log.Println("Backup - error while Backup:", err)
 		return "", err
 	}
 
 	backupDkgResultStr, err := json.Marshal(backupDkgResult)
 	if err != nil {
-		log.Println("error while marshaling dkgresult json:", err)
+		log.Println("Backup - error while marshaling dkgresult json:", err)
 		return "", err
 	}
 
@@ -667,7 +668,7 @@ func Backup(host, dkgResultStr, metadata, authData string) (string, error) {
 
 	respJSON, err := json.Marshal(res)
 	if err != nil {
-		log.Println("error while marshaling dkgresult json:", err)
+		log.Println("Backup - error while marshaling dkgresult json:", err)
 		return "", err
 	}
 
@@ -678,20 +679,20 @@ func FromBackup(host, _backup, authData string) (*tss.DkgResult, string, error) 
 
 	backupBytes, err := hex.DecodeString(_backup)
 	if err != nil {
-		log.Println("error while Backup (hex decode):", err)
+		log.Println("FromBackup - error while Backup (hex decode):", err)
 		return nil, "", err
 	}
 
 	var backupDkgResult map[string]string
 	err = json.Unmarshal(backupBytes, &backupDkgResult)
 	if err != nil {
-		log.Println("error while Backup (json unmarshal):", err)
+		log.Println("FromBackup - error while Backup (json unmarshal):", err)
 		return nil, "", err
 	}
 
 	dkgResult, metadata, err := backup(host, backupDkgResult["DkgResult"], backupDkgResult["Metadata"], authData)
 	if err != nil {
-		log.Println("error while Backup:", err)
+		log.Println("FromBackup - error while Backup:", err)
 		return nil, "", err
 	}
 
