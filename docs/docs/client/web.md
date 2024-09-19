@@ -54,6 +54,10 @@ Once you create a wallet for a user, potentially at sign up, you will most proba
 const public_key = wallet.From()
 ```
 
+:::info
+We recommend to initialise Meemaw as soon as the page loads, as the wasm file is relatively heavy. It's easy to do so within `useEffect` (React) or `window.onload` (vanila) for example. You can check [our example](https://github.com/getmeemaw/example-js) to give you an idea.
+:::
+
 ### Sign normal transaction (Ethereum)
 
 In order to send funds, the first step is to craft the raw transaction, then to sign it using the Meemaw wallet.
