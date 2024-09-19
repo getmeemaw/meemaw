@@ -55,7 +55,7 @@ const public_key = wallet.From()
 ```
 
 :::info
-We recommend to initialise Meemaw as soon as the page loads, as the wasm file is relatively heavy. It's easy to do so within `useEffect` (React) or `window.onload` (vanila) for example. You can check [our example](https://github.com/getmeemaw/example-js) to give you an idea.
+We recommend to initialise Meemaw as soon as the page loads, as the wasm file is relatively heavy (~6mb compressed). It's easy to do so within `useEffect` (React) or `window.onload` (vanila) for example. You can check [our example](https://github.com/getmeemaw/example-js) to give you an idea.
 :::
 
 ### Sign normal transaction (Ethereum)
