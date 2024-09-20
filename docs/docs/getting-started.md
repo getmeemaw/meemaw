@@ -155,7 +155,7 @@ That's it!
 
 Okay, we've got a nice example running. However, this is clearly not a production setup. Here is a non-exhaustive list of a few elements that you would need to change to get your App ready for production:
 
-* **Fix Meemaw's version:** in the Docker Compose file, replace the "latest" tag with the actual version you want to use. This avoids braking changes affecting your setup.
+* **Fix Meemaw's version:** in the Docker Compose file, replace the "latest" tag with the actual version you want to use. This avoids breaking changes affecting your setup.
 * **Separate Meemaw's DB from the server:** we cheated a bit here by magically deploying a Postgresql DB with Docker Compose. You probably want to have a proper managed DB with adequate accesses.
 * **Separate Meemaw from the App server:** your App is served from the same machine as Meemaw. You should separate them and greatly reduce access to the Meemaw machine. Keep it secure.
 * **Buid the App and serve static files:** you should not run `npm run dev` in production. Instead, you should build the App and serve the files through a proper web server.
