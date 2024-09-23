@@ -1,6 +1,6 @@
 import React from 'react';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
-import {useBlogPost} from '@docusaurus/theme-common/internal';
+import {useBlogPost} from '@docusaurus/plugin-content-blog/client';
 export default function BlogPostItemContainer({children, className}) {
   const {frontMatter, assets} = useBlogPost();
   const {withBaseUrl} = useBaseUrlUtils();
