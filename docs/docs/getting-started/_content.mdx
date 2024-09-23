@@ -1,0 +1,36 @@
+import Server from './_server.mdx';
+import Cloud from './_cloud.mdx';
+import Example from './_example.mdx';
+import SelfRequirements from './_self-requirements.mdx';
+import CloudRequirements from './_cloud-requirements.mdx';
+import SelfNextSteps from './_self-next-steps.mdx';
+import CloudNextSteps from './_cloud-next-steps.mdx';
+
+
+## Requirements
+
+You need:
+
+{props.name === 'cloud' ? (<CloudRequirements />) : (<SelfRequirements />)}
+
+Also, let's download a working example so that we can get our feet wet super easily:
+
+```
+git clone https://github.com/getmeemaw/example-js.git
+```
+
+Once the example is downloaded, you can already `cd example-js` to be ready for the next steps.
+
+We will explain the Meemaw specific parts of this example in this page. The rest is typical React and some [Supabase specific stuff](https://supabase.com/docs/guides/auth/auth-helpers/auth-ui).
+
+{props.name === 'cloud' ? <Cloud /> : <Server />}
+<Example />
+
+
+## Next steps
+
+Okay, we've got a nice example running. However, this is clearly not a production setup. Here is a non-exhaustive list of a few elements that you would need to change to get your App ready for production:
+
+{props.name === 'cloud' ? (<CloudNextSteps />) : (<SelfNextSteps />)}
+
+We will soon offer a Cloud service to make it super easy for you to have a production-ready setup in a few minutes.

@@ -1,74 +1,19 @@
----
-sidebar_position: 2
----
-
-# Getting Started
-
-So you want to start using Meemaw?! Excellent! 🤘
-
-:::info
-**Meemaw is still under heavy development, we would not advise you to use it in production just yet.** That being said, you should totally experiment with it and let us know how it goes!
-:::
-
-Also, this is just scratching the surface, you can find a whole lot more in the rest of the docs.
-
-## Let's get started
-
-Ok let's start with a simple yet complete example. We will deploy the server with [Docker](https://www.docker.com/), link it with a [Supabase](https://supabase.com/) instance for authentication, and use our Web SDK to deploy a trustless wallet for each of your users.
-
-## Requirements
-
-You need:
-
-* a machine (VPS, dedicated server, your computer, etc) with [NodeJS v>=20](https://nodejs.org/), [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
-* access to a JSON-RPC API to ensure your application can access the Sepolia blockchain ([Alchemy](https://www.alchemy.com/), [Infura](https://www.infura.io/), etc)
-* a [Supabase](https://supabase.com/) project and your `public API key` and `URL` handy (the free tier is fine)
-* familiarity with basic Web3 concepts (i.e. you understand what is required to send a transaction)
-
-Also, let's download a working example so that we can get our feet wet super easily:
-
-```
-git clone https://github.com/getmeemaw/example-js.git
-```
-
-Once the example is downloaded, you can already `cd example-js` to be ready for the next steps.
-
-We will explain the Meemaw specific parts of this example in this page. The rest is typical React and some [Supabase specific stuff](https://supabase.com/docs/guides/auth/auth-helpers/auth-ui).
-
-## Deploy server
-
-You will learn a bit later how to [configure Meemaw](/docs/server#config) and modify the [Docker compose configuration](/docs/server#docker-compose) for your specific needs, but if you downloaded the example above, **there is just one thing you need to do**: in `server/.env`, update `SUPABASE_URL` and `SUPABASE_API_KEY` with yours.
-
-Then you can actually deploy the server. **Make sure you're in the server directory and that Docker is running**, then just start the server with:
-
-```
-docker compose up
-```
-
-You should be greeted with a bunch of text, including something like this:
-```
-meemaw_app  | 2042/05/04 11:59:59 Logging enabled
-meemaw_app  | 2042/05/04 11:59:59 Connected to DB
-meemaw_app  | 2042/05/04 11:59:59 Schema does not exist, creating...
-meemaw_app  | 2042/05/04 11:59:59 Schema loaded
-meemaw_app  | 2042/05/04 11:59:59 Starting server on port 8421
-```
-
-Congrats, Meemaw's server is running 🎉
-
-If it does not work as expected, join us on Discord! We will happily help get you started.
-
 ## Run the example
 
 Let's run the example a first time, then we'll go through part of the code together to understand how the Meemaw part works.
 
 ### Configure your App
-Before we do anything, there are just two things you need to configure on the client side: 
-- the URL of your JSON-RPC API. Update the following line:
+Before we do anything, there are just three things you need to configure on the client side: 
+- your project URL. Find `Meemaw.init` and update it with your project URL: 
+    ```javascript title="client/src/app/tx.jsx"
+    const meemaw = await Meemaw.init('https://getmeemaw.co/YOUR-PROJECT-URL');
+    ```
+    - Note: if you're self-hosting Meemaw locally, you don't need to change anything.
+- the URL of your JSON-RPC API. Update the following line with your own URL:
     ```javascript title="client/src/app/tx.jsx"
     const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8421/rpc"));
     ```
-- your Supabase URL and API Key. It's not the same step as above, we're configuring the client this time 😊 Modify `.env.local` in the `client/` folder, replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_API_KEY` with yours.
+- your Supabase URL and API Key. Modify `.env.local` in the `client/` folder, replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_API_KEY` with yours.
 
 ### Install dependencies
 Cool so you've got the source code downloaded on your machine and the project is configured and ready to be launched. Just before we can run our example, we need to install all dependencies. **Open a new terminal and make sure you're in the client directory** then run this command:
@@ -149,16 +94,4 @@ const signedTransaction = await wallet.SignTransaction(raw, chainId);
 const txReceipt = await web3.eth.sendSignedTransaction(signedTransaction);
 ```
 
-That's it! 
-
-## Next steps
-
-Okay, we've got a nice example running. However, this is clearly not a production setup. Here is a non-exhaustive list of a few elements that you would need to change to get your App ready for production:
-
-* **Fix Meemaw's version:** in the Docker Compose file, replace the "latest" tag with the actual version you want to use. This avoids breaking changes affecting your setup.
-* **Separate Meemaw's DB from the server:** we cheated a bit here by magically deploying a Postgresql DB with Docker Compose. You probably want to have a proper managed DB with adequate accesses.
-* **Separate Meemaw from the App server:** your App is served from the same machine as Meemaw. You should separate them and greatly reduce access to the Meemaw machine. Keep it secure.
-* **Buid the App and serve static files:** you should not run `npm run dev` in production. Instead, you should build the App and serve the files through a proper web server.
-* **Follow security guidelines:** your Meemaw installation is only as secure as the security measures you follow. Please make sure you follow all [our security guidelines](/docs/security)
-
-We will soon offer a Cloud service to make it super easy for you to have a production-ready setup in a few minutes.
+That's it!
