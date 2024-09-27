@@ -1,20 +1,25 @@
 ---
 slug: mpc-wallet
-title: MPC Wallets for Dummies
+title: I explain MPC wallets to Kanye West
 authors: [marceau]
 tags: []
 ---
 
 <p align="center">
-  <img src="/img/steve3_small.webp" alt="Description of the image" width="300" />
+  <img src="/img/kanye.png" alt="Kanye is confused" width="350" />
 </p>
 
-
-Imagine a world where Steve Jobs and a Swiss Banker collaborate to create a crypto wallet. The result? We bet it would be MPC wallets: a more secure and ultimately user-friendly solution.
-
-To understand the technology, let's compare it to a real-life situation. Imagine you're a millionaire with stacks of $100 bills to your name. How would you secure this wealth?
+Crazy terms are thrown around everywhere in the crypto sphere. No wonder Kanye is confused 😊 But it is oftentimes possible to explain complex technologies clearly and simply. I will try to explain MPC wallets with a simple analogy, so buckle up.
 
 <!-- truncate -->
+
+Imagine a world where Steve Jobs and a Swiss Banker collaborate to create a crypto wallet. The result? I bet it would be MPC wallets: a more secure and ultimately user-friendly solution.
+
+<p align="center">
+  <img src="/img/steve3_small.webp" alt="Steve and his Swiss banker friend" width="300" />
+</p>
+
+To understand the technology, let's compare it to a real-life situation. Imagine you're a millionaire with stacks of $100 bills to your name. How would you secure this wealth?
 
 ## From Mattress to Arnold Schwarzekeeper
 
@@ -23,7 +28,7 @@ The simplest way, albeit not the most practical, would be to stash all your mone
 However, keeping your wealth under a mattress is risky and you're afraid of people breaking into your house. So, you decide to entrust your money to your neighbor, Arnold Schwarzekeeper. He's strong and knows how to fight cyborgs, plus he's also storing your other neighbors' cash. This is comforting. However, you also remember Conor McGator, Arnold's pal who lived just around the corner. He was in the same boat until he lost all his neighbors' cash in a blink.
 
 <p align="center">
-  <img src="/img/arnold_conor_small.webp" alt="Description of the image" width="500" />
+  <img src="/img/arnold_conor_small.webp" alt="Arnold still has the money but Conor lost it" width="500" />
 </p>
 
 :::warning
@@ -39,7 +44,7 @@ Now, if you want to buy, say a brand new Apple Vision Pro, you just need to meet
 The nice thing about splitting these magic bills is that you can actually split them in more than two parts, and then decide how many parts are required to spend the money.
 
 <p align="center">
-  <img src="/img/ar_small.webp" alt="Description of the image" width="250" />
+  <img src="/img/ar_small.webp" alt="Bills splitting" width="250" />
 </p>
 
 :::tip
@@ -53,7 +58,7 @@ Your stash of cash is now safe 😎 As you realise the power of splitting bills,
 When a neighbor wants to buy something, you provide them with split-bills to recombine with their own. If you're unavailable, they can turn to their Grandma for some split-bills. The beauty of this system lies in its security: you cannot spend your neighbors' funds, and even if your house is robbed, the split-bills are useless to the thief.
 
 <p align="center">
-  <img src="/img/neighbor_small.webp" alt="Description of the image" width="300" />
+  <img src="/img/neighbor_small.webp" alt="Helping neighbours with their cash" width="300" />
 </p>
 
 :::tip
@@ -74,11 +79,11 @@ Ok, stories are nice, but there are two terms we need to clarify:
 
 ## Conclusion
 
-This blog post was written with the objective of simplifying the concept of MPC wallets. It does not go into great technical details, but you can easily find those online. It also simplifies a few things to make the comparison somewhat understandable.
+This blog post was written with the objective of simplifying the concept of MPC wallets. Hopefully it helped Kanye understand what they are 😊 It does not go into great technical details, but you can easily find those online. It also simplifies a few things to make the comparison somewhat understandable.
 
 If you only remember three things today, it should be that MPC wallet-as-a-service solutions like Meemaw are :
 - **more secure** (non-custodial and trustless): private keys never appear anywhere, the server cannot spend funds by itself
 - **more robust**: users can recover funds without the intervention of the server if they need to, avoiding funds being blocked
 - **more user-friendly**: no need for crazy passwords or seed phrases, developers are free to build amazing experiences
 
-Have a great day 😊
+Have a great day !

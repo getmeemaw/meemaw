@@ -1,6 +1,6 @@
 ---
 slug: open-source
-title: Coinbase WaaS might crumble your house
+title: 'Strong foundations: house VS web3 business'
 authors: [marceau]
 tags: []
 ---
@@ -24,7 +24,7 @@ Problems :
   <img src="/img/house_small.webp" alt="Description of the image" width="300" />
 </p>
 
-Don't worry, your real house is not at risk! But let me explain. If you're planning to deploy a wallet for each of your users, you should seriously consider a wallet-as-a-service solution that is **open-source**. We believe it's essential for your business's long-term success, not just a nice to have. Here's why, through a simple story:
+If you're planning to deploy a wallet for each of your users, you should seriously consider a wallet-as-a-service solution that is **open-source**. We believe it's essential for your business's long-term success, not just a nice to have. Here's why, through a simple story:
 
 <!-- truncate -->
 
