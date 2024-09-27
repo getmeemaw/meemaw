@@ -9,7 +9,7 @@ tags: []
   <img src="/img/kanye.png" alt="Kanye is confused" width="350" />
 </p>
 
-Crazy terms are thrown around everywhere in the crypto sphere. No wonder Kanye is confused 😊 But it is oftentimes possible to explain complex technologies clearly and simply. I will try to explain MPC wallets with a simple analogy, so buckle up.
+Crazy terms are thrown around everywhere in the crypto sphere. No wonder Kanye is confused 😊 I apologise for the slightly click-bait-y title, but this is really how most people look like when I tell them about what we do. However, it is oftentimes possible to explain complex technologies clearly and simply. I will try to explain MPC wallets with a simple analogy, so buckle up.
 
 <!-- truncate -->
 
