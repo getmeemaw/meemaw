@@ -32,7 +32,7 @@ However, keeping your wealth under a mattress is risky and you're afraid of peop
 </p>
 
 :::warning
-This is the equivalent of exchanges like Coinbase or conventional wallet-as-a-service platforms like Magic. They hold your private keys so that you don't have to worry about them. Obviously, that means you need to trust them to keep them secure, and not to block your funds! We all remember the times when Binance lost $586 million or when FTX blocked all customers from taking money out...
+This is the equivalent of exchanges like Binance or conventional wallet-as-a-service platforms like Magic. They hold your private keys so that you don't have to worry about them. Obviously, that means you need to trust them to keep them secure, and not to block your funds! We all remember the times when Binance lost $586 million or when FTX blocked all customers from taking money out...
 :::
 
 ## Splitting Bills with Grandma
