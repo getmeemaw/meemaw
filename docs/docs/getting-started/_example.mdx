@@ -4,16 +4,16 @@ Let's run the example a first time, then we'll go through part of the code toget
 
 ### Configure your App
 Before we do anything, there are just three things you need to configure on the client side: 
-- your project URL. Find `Meemaw.init` and update it with your project URL: 
+- Your project URL. Find `Meemaw.init()` in the file `client/src/app/tx.jsx` and update it with your project URL: 
     ```javascript title="client/src/app/tx.jsx"
     const meemaw = await Meemaw.init('https://getmeemaw.co/YOUR-PROJECT-URL');
     ```
-    - Note: if you're self-hosting Meemaw locally, you don't need to change anything.
-- the URL of your JSON-RPC API. Update the following line with your own URL:
+    - Note: if you're self-hosting Meemaw locally, you just need to uncomment the localhost line.
+- The URL of your JSON-RPC API. Update the following line with your own URL:
     ```javascript title="client/src/app/tx.jsx"
-    const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8421/rpc"));
+    const web3 = new Web3(new Web3.providers.HttpProvider("YOUR-JSON-RPC-API-URL"));
     ```
-- your Supabase URL and API Key. Modify `.env.local` in the `client/` folder, replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_API_KEY` with yours.
+- Your Supabase URL and API Key. Modify `.env.local` in the `client/` folder, replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_API_KEY` with yours. Those are the same you provided in your Meemaw Cloud dashboard. This is only required because the example showcases a full signup/login process.
 
 ### Install dependencies
 Cool so you've got the source code downloaded on your machine and the project is configured and ready to be launched. Just before we can run our example, we need to install all dependencies. **Open a new terminal and make sure you're in the client directory** then run this command:
