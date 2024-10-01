@@ -125,6 +125,7 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 		// Verify wss (if not dev mode)
 		if !server._config.DevMode {
 			if r.URL.Scheme != "wss" {
+				log.Println("authMiddleware - secure connection required")
 				http.Error(w, "Secure connection required", http.StatusUnauthorized)
 				return
 			}
@@ -134,6 +135,7 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 		params := r.URL.Query()
 		tokenParam, ok := params["token"]
 		if !ok || len(tokenParam) == 0 {
+			log.Println("authMiddleware - you need to provide an access token")
 			http.Error(w, "You need to provide an access token", http.StatusUnauthorized)
 			return
 		}
@@ -141,12 +143,14 @@ func (server *Server) authMiddleware(next http.Handler) http.Handler {
 		// Find the userId related to the token in cache
 		paramsInterface, found := server._cache.Get(tokenParam[0])
 		if !found {
+			log.Println("authMiddleware - access token does not exist")
 			http.Error(w, "The access token does not exist", http.StatusUnauthorized)
 			return
 		}
 
 		tokenParams, ok := paramsInterface.(tokenParameters)
 		if !ok {
+			log.Println("authMiddleware - could not infer tokenParameters type")
 			http.Error(w, "Issue during authorization", http.StatusBadRequest)
 			return
 		}
