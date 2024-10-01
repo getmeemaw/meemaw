@@ -143,7 +143,7 @@ jobs:
           path: ./meemaw-ios
 
       - name: Copy SDK files
-        run: cp -r client/ios/meemaw/* meemaw-ios/
+        run: cp -r client/ios/meemaw-ios/* meemaw-ios/
 
       - name: Commit and push
         run: |
