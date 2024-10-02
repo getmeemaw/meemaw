@@ -3,6 +3,7 @@ slug: mpc-wallet
 title: I explain MPC wallets to Kanye West
 authors: [marceau]
 tags: []
+image: "https://getmeemaw.com/img/arnold_conor_small.webp"
 ---
 
 <p align="center">
