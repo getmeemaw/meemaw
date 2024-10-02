@@ -47,6 +47,8 @@ Not any more. We are building solutions to make it easier and more secure for de
 
 Right now, **Meemaw allows you to deploy a trustless MPC-TSS wallet for each of your users.** [It only takes a few lines of code](#getting-started), even your Grandma would want to use it. It's also way less risky for you than trusting another company or holding the whole wallets yourself, as your server never sees the private keys.
 
+[Meemaw Cloud](https://getmeemaw.com)
+
 # Features
 
 Available right now:
@@ -67,7 +69,6 @@ Exciting things we're looking forward to:
 
 - [ ] **Android & Cross-platform frameworks**: If you're using Android or cross-platform frameworks, we plan to be able to cover your needs. Meemaw will be compatible with Web, iOS, Android, React Native, Flutter and Kotlin Multiplatform.
 - [ ] **Biometrics & Passkeys**: Depending on platforms and applications, you will be able to encrypt and protect client shares with biometrics and/or passkeys. We want to reach state of the art security on all aspects.
-- [ ] **Cloud offering**: You can easily self-host Meemaw with a few clicks, and soon you will be able to trust us to host it for you and make your life easier and safer. We will also offer Entreprise services and additional features for ambitious projects.
 - [ ] **Account abstraction**: People often oppose MPC wallets with account abstractions, but they are complementary! We will combine them so you can abstract gas payment from your users, innovate on UX and add one more layer of protection, for example.
 <!-- - [ ] **Dual server mode**: You will be able to perform the TSS process between two servers, removing the need to store anything client-side. You will also be able to combine one server you self-host and one server we host on our cloud, maximising the benefits. -->
 
