@@ -7,7 +7,7 @@
 <h3 align="center">Trustless and Grandma-friendly Wallet as a Service</h3>
 
 <p align="center">
-    <img src="https://img.shields.io/badge/Latest-v1.2.0-blue"/>
+    <img src="https://img.shields.io/badge/Latest-v1.2.2-blue"/>
     <img src="https://img.shields.io/badge/Stability-Beta-orange"/>
     <img src="https://img.shields.io/badge/License-AGPL%20v3-green.svg"/>
 </p>
