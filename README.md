@@ -16,14 +16,8 @@
 
 Deploy a trustless wallet for each of your users, in a few lines of code 🚀 
 * Join us on [Discord](https://discord.gg/uf8Uzqp2)
-* [Get started](https://getmeemaw.com/docs/getting-started)
+* Get started [with our docs](https://getmeemaw.com/docs/getting-started)
 * Hosted version with [Meemaw Cloud](https://getmeemaw.com)
-  
-[https://getmeemaw.com](https://getmeemaw.com)
-
-```diff
-- Meemaw is in Beta 
-```
 
 Table of Contents
 =================
