@@ -17,11 +17,12 @@
 Deploy a trustless wallet for each of your users, in a few lines of code 🚀 
 * Join us on [Discord](https://discord.gg/uf8Uzqp2)
 * [Get started](https://getmeemaw.com/docs/getting-started)
+* Hosted version with [Meemaw Cloud](https://getmeemaw.com)
   
 [https://getmeemaw.com](https://getmeemaw.com)
 
 ```diff
-- Meemaw is still under heavy development, we would not advise you to use it in production just yet. 
+- Meemaw is in Beta 
 ```
 
 Table of Contents
@@ -46,8 +47,6 @@ Onboarding users on Web3 projects is a pain. You mostly have a choice between 3 
 Not any more. We are building solutions to make it easier and more secure for developers to onboard new people to Web3, at scale.
 
 Right now, **Meemaw allows you to deploy a trustless MPC-TSS wallet for each of your users.** [It only takes a few lines of code](#getting-started), even your Grandma would want to use it. It's also way less risky for you than trusting another company or holding the whole wallets yourself, as your server never sees the private keys.
-
-[Meemaw Cloud](https://getmeemaw.com)
 
 # Features
 
