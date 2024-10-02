@@ -6,7 +6,7 @@ const darkCodeTheme = require('prism-react-renderer').themes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Meemaw - Docs',
+  title: 'Meemaw',
   tagline: 'Grandma-friendly Wallet as a Service',
   favicon: 'https://getmeemaw.com/static/img/logo/grandma-favicon.webp',
 
