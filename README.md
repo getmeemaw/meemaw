@@ -7,7 +7,7 @@
 <h3 align="center">Trustless and Grandma-friendly Wallet as a Service</h3>
 
 <p align="center">
-    <img src="https://img.shields.io/badge/Latest-v1.2.0-blue"/>
+    <img src="https://img.shields.io/badge/Latest-v1.2.2-blue"/>
     <img src="https://img.shields.io/badge/Stability-Beta-orange"/>
     <img src="https://img.shields.io/badge/License-AGPL%20v3-green.svg"/>
 </p>
@@ -16,13 +16,8 @@
 
 Deploy a trustless wallet for each of your users, in a few lines of code 🚀 
 * Join us on [Discord](https://discord.gg/uf8Uzqp2)
-* [Get started](https://getmeemaw.com/docs/getting-started)
-  
-[https://getmeemaw.com](https://getmeemaw.com)
-
-```diff
-- Meemaw is still under heavy development, we would not advise you to use it in production just yet. 
-```
+* Get started [with our docs](https://getmeemaw.com/docs/getting-started)
+* Hosted version with [Meemaw Cloud](https://getmeemaw.com)
 
 Table of Contents
 =================
@@ -67,7 +62,6 @@ Exciting things we're looking forward to:
 
 - [ ] **Android & Cross-platform frameworks**: If you're using Android or cross-platform frameworks, we plan to be able to cover your needs. Meemaw will be compatible with Web, iOS, Android, React Native, Flutter and Kotlin Multiplatform.
 - [ ] **Biometrics & Passkeys**: Depending on platforms and applications, you will be able to encrypt and protect client shares with biometrics and/or passkeys. We want to reach state of the art security on all aspects.
-- [ ] **Cloud offering**: You can easily self-host Meemaw with a few clicks, and soon you will be able to trust us to host it for you and make your life easier and safer. We will also offer Entreprise services and additional features for ambitious projects.
 - [ ] **Account abstraction**: People often oppose MPC wallets with account abstractions, but they are complementary! We will combine them so you can abstract gas payment from your users, innovate on UX and add one more layer of protection, for example.
 <!-- - [ ] **Dual server mode**: You will be able to perform the TSS process between two servers, removing the need to store anything client-side. You will also be able to combine one server you self-host and one server we host on our cloud, maximising the benefits. -->
 
