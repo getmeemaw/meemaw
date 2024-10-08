@@ -4,6 +4,7 @@ title: I explain MPC wallets to Kanye West
 authors: [marceau]
 tags: []
 image: "https://getmeemaw.com/img/arnold_conor_small.webp"
+description: MPC wallets are more secure and more robust, but not easy to understand. Follow along this simple analogy...
 ---
 
 <p align="center">
