@@ -3,7 +3,7 @@ slug: mpc-wallet
 title: I explain MPC wallets to Kanye West
 authors: [marceau]
 tags: []
-image: "https://getmeemaw.com/static/img/social/banner.jpg"
+image: "https://getmeemaw.com/static/img/social/banner-updated.jpg"
 description: "MPC wallets are more secure and more robust, but not easy to understand. Follow along this simple analogy..."
 ---
 
