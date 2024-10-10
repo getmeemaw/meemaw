@@ -17,6 +17,15 @@ import (
 	"nhooyr.io/websocket/wsjson"
 )
 
+/////////
+//
+// server/tss_add.go manages multi-device operations from the server side through two complex handlers: RegisterDeviceHandler and AcceptDeviceHandler.
+// The multi-device process needs to be initiated by a new device by using RegisterDeviceHandler, then accepted by an existing device by using AcceptDeviceHandler.
+// The way it works is through a TSS process between 3 actors: new device, existing device, server.
+// Those 3 actors communicate 1-1 with each other, which means that the server needs to manage 2 websocket connections (with each device) and route messages accordingly.
+//
+/////////
+
 type PublicWallet struct {
 	PublicKey tss.PubkeyStr
 	BKs       map[string]tss.BK

@@ -11,9 +11,9 @@ import (
 	"github.com/getmeemaw/meemaw/utils/types"
 )
 
-// ExportHandler exports the private key from the server and client shares
+// ExportHandler exports the private key given the server and client shares
 // goes through the authMiddleware to confirm the access token and get the userId
-// requires the client share (provided in URL parameter)
+// requires the client share (provided as URL parameter)
 func (server *Server) ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Verify POST request

@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/BurntSushi/toml"
 	"github.com/getmeemaw/meemaw/server"
 	"github.com/getmeemaw/meemaw/server/database"
 	"github.com/getmeemaw/meemaw/server/vault"
@@ -18,6 +17,12 @@ import (
 
 	_ "embed"
 )
+
+/////////
+//
+// cmd is the entrypoint of Meemaw. It loads the config, the db, the vault, and starts the server.
+//
+/////////
 
 //go:generate bash -c "GOOS=js GOARCH=wasm go build -o meemaw.wasm ../../client/web/wasm/main.go"
 
@@ -90,28 +95,6 @@ func main() {
 
 	// start server
 	server.Start()
-}
-
-func loadConfigFromFile(path string) (*server.Config, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	bytes, err := io.ReadAll(file)
-	if err != nil {
-		log.Println("Could not read config file:", err)
-		return nil, err
-	}
-
-	var config server.Config
-	if err := toml.Unmarshal(bytes, &config); err != nil {
-		log.Fatalf("Failed to unmarshal configuration: %v", err)
-		os.Exit(1)
-	}
-
-	return &config, nil
 }
 
 func loadConfigFromEnvs() (*server.Config, error) {

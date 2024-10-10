@@ -8,6 +8,12 @@ import (
 	"github.com/getmeemaw/meemaw/utils/tss"
 )
 
+/////////
+//
+// client/ios/ios.go implements a bunch of helpers required in order to be able to use all client functions in Swift.
+//
+/////////
+
 ////////
 
 // compile :
