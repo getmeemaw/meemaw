@@ -23,6 +23,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
+		log.Println("DkgHandler - authorization info not found")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
@@ -32,11 +33,11 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if no existing wallet for that user
 	err := server._vault.WalletExists(r.Context(), userId)
 	if err == nil {
-		log.Println("Wallet already exists for that user.")
+		log.Println("DkgHandler - Wallet already exists for that user.")
 		http.Error(w, "Conflict", http.StatusConflict)
 		return
 	} else if err != sql.ErrNoRows {
-		log.Println("Error when getting user for dkg, but not sql.ErrNoRows although it should:", err)
+		log.Println("DkgHandler - Error when getting user for dkg, but not sql.ErrNoRows although it should:", err)
 		http.Error(w, "Conflict", http.StatusConflict)
 		return
 	}
@@ -48,7 +49,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	if server._config.ClientOrigin != "*" {
 		u, err := url.Parse(server._config.ClientOrigin)
 		if err != nil {
-			log.Println("ClientOrigin wrongly configured")
+			log.Println("DkgHandler - ClientOrigin wrongly configured")
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -113,7 +114,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 			case ws.PeerIdBroadcastMessage:
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("PeerIdBroadcastMessage message but we're at later stage; stage:", stage)
+					log.Println("DkgHandler - PeerIdBroadcastMessage message but we're at later stage; stage:", stage)
 					continue
 				}
 
@@ -137,7 +138,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				// verify stage : if tss message but we're at storage stage or further, discard
 				if stage > msg.Type.MsgStage {
 					// discard
-					log.Println("TSS message but we're at later stage; stage:", stage)
+					log.Println("DkgHandler - TSS message but we're at later stage; stage:", stage)
 					continue
 				}
 
@@ -146,7 +147,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				// Decode TSS msg
 				byteString, err := hex.DecodeString(msg.Msg)
 				if err != nil {
-					log.Println("error decoding hex:", err)
+					log.Println("DkgHandler - error decoding hex:", err)
 					errs <- err
 					return
 				}
@@ -154,7 +155,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				tssMsg := &tss.Message{}
 				err = json.Unmarshal(byteString, &tssMsg)
 				if err != nil {
-					log.Println("could not unmarshal tss msg:", err)
+					log.Println("DkgHandler - could not unmarshal tss msg:", err)
 					errs <- err
 					return
 				}
@@ -162,7 +163,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				// Handle tss message (NOTE : will automatically, in ServerAdd.HandleMessage, redirect to other client if needs be)
 				err = dkg.HandleMessage(tssMsg)
 				if err != nil {
-					log.Println("could not handle tss msg:", err)
+					log.Println("DkgHandler - could not handle tss msg:", err)
 					errs <- err
 					return
 				}
@@ -174,7 +175,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 				close(serverDone)
 
 			default:
-				log.Println("Unexpected message type:", msg.Type)
+				log.Println("DkgHandler - Unexpected message type:", msg.Type)
 				errorMsg := ws.Message{Type: ws.ErrorMessage, Msg: "error: Unexpected message type"}
 				err := wsjson.Write(ctx, c, errorMsg)
 				if err != nil {
@@ -198,8 +199,8 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Start Adder process.
 	dkgResult, err := dkg.Process()
 	if err != nil {
-		log.Println("Error while adder process:", err)
-		c.Close(websocket.StatusInternalError, "adder process failed")
+		log.Println("DkgHandler - Error while dkg process:", err)
+		c.Close(websocket.StatusInternalError, "dkg process failed")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -207,6 +208,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	// Error management
 	err = ws.ProcessErrors(errs, ctx, c, "DkgHandler")
 	if err != nil {
+		log.Println("DkgHandler - dkg process failed:", err)
 		c.Close(websocket.StatusInternalError, "DkgHandler process failed")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -220,7 +222,7 @@ func (server *Server) DkgHandler(w http.ResponseWriter, r *http.Request) {
 	userAgent := r.UserAgent()
 	metadata, err := server._vault.StoreWallet(r.Context(), userId, clientPeerID, userAgent, dkgResult) // use context from request
 	if err != nil {
-		log.Println("Error while storing dkg result:", err)
+		log.Println("DkgHandler - Error while storing dkg result:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
