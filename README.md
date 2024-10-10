@@ -40,15 +40,15 @@ Onboarding users on Web3 projects is a pain. You mostly have a choice between 3 
 
 Not any more. We are building solutions to make it easier and more secure for developers to onboard new people to Web3, at scale.
 
-Right now, **Meemaw allows you to deploy a trustless MPC-TSS wallet for each of your users.** [It only takes a few lines of code](#getting-started), even your Grandma would want to use it. It's also way less risky for you than trusting another company or holding the whole wallets yourself, as your server never sees the private keys.
+Right now, **Meemaw allows you to deploy a trustless MPC wallet for each of your users.** [It only takes a few lines of code](#getting-started), even your Grandma would want to use it. It's also way less risky for you than trusting another company or holding the whole wallets yourself, as your server never sees the private keys.
 
 # Features
 
 Available right now:
 
 - [x] **Trustless**: Meemaw wallets are MPC-TSS (Multi-Party Computation with Threshold Signature Scheme) wallets. They are non-custodial and zero-knowledge: the private keys of your users never appear on your servers so they don't need to trust you with their assets.
-- [x] **Easy**: You can easily deploy Meemaw with Docker. You can then use the client SDKs to easily integrate it in a few lines of code. It's easy to offer an amazing web2-like experience to your users.
-- [x] **Multi-device**: Most MPC-TSS Wallet providers only allow one device per wallet, because it's easier to build. With Meemaw, your users can add additional devices for practicality and redundancy.
+- [x] **Easy**: You can easily deploy Meemaw with Docker or use Meemaw Cloud for an even easier ramp up. You can then use the client SDKs to easily integrate Meemaw inside your app or website in a few lines of code.
+- [x] **Multi-device**: Most MPC Wallet providers only allow one device per wallet, because it's easier to build. With Meemaw, your users can add additional devices for practicality and redundancy.
 - [x] **Web & iOS**: It's easy to integrate Meemaw in your Web & iOS apps. Use the appropriate SDK and you're good to go. Note that we are planning to add support for Android and cross-platform frameworks as well.
 - [x] **Integrates with your Auth**: Meemaw is built so that you can easily integrate with your own Auth provider. We are also continuously adding one-click integrations for more and more third-party Auth providers.
 - [x] **Battle-tested technologies**: Meemaw is NOT innovating on the actual technology (TSS and others). Instead, it aims at bringing together established and production-ready technologies to form a coherent experience while reducing risk. 
