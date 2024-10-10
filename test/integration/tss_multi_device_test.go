@@ -37,6 +37,14 @@ func TestMultiDevice(t *testing.T) {
 	}
 
 	t.Logf("Successful %s\n", testCase)
+
+	///////////////////
+	/// TODO
+
+	// - registerDevice when there is no existing device/wallet
+	// - acceptDevice when there is no device to register
+	// - two devices registering
+	// - two devices accepting
 }
 
 /////////////
