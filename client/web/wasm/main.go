@@ -15,6 +15,12 @@ import (
 	"github.com/getmeemaw/meemaw/utils/tx"
 )
 
+/////////
+//
+// client/web/wasm/main.go implements a bunch of helpers required in order to be able to use all client functions in Javascript.
+//
+/////////
+
 // compile :
 // GOOS=js GOARCH=wasm go build -o wasm_std.wasm ./main.go
 // 		GOOS=js GOARCH=wasm go build -o wasm_std.wasm ./main.go && mv wasm_std.wasm ../wasm.wasm

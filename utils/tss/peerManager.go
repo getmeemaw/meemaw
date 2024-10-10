@@ -11,6 +11,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+/////////
+//
+// PeerManager is the struct managing the peers and the outgoing messages for each TSS actor.
+// Initialising a TSS service (dkg, sign, register, accept) requires a PeerManager that has been initialised with all the peers.
+// Throughout the TSS process, Every time a message needs to be sent to a peer, the TSS service uses MustSend().
+// In order to be sent, the message is then recovered by the particular handler or method managing the websocket connection, by using one of the GetNextMessageToSend variations depending on the use case.
+// On the receiving end, the message is handled through the handleMessageFunction().
+// Note: Meemaw's PeerManager struct fits the PeerManager interface defined by Alice.
+//
+/////////
+
 type Message struct {
 	PeerID  string
 	Message interface{}
@@ -61,17 +72,6 @@ func (p *PeerManager) MustSend(peerID string, message interface{}) {
 	})
 }
 
-// // EnsureAllConnected connects the host to specified peer and sends the message to it.
-// func (p *peerManager) EnsureAllConnected() {
-// 	var wg sync.WaitGroup
-
-// 	for _, peerAddr := range p.peers {
-// 		wg.Add(1)
-// 		go connectToPeer(p.host, peerAddr, &wg)
-// 	}
-// 	wg.Wait()
-// }
-
 // AddPeers adds peers to peer list.
 func (p *PeerManager) AddPeer(peerID string) {
 	p.mu.Lock()
@@ -80,6 +80,8 @@ func (p *PeerManager) AddPeer(peerID string) {
 	p.peers[peerID] = true
 }
 
+// GetNextMessageToSendAll returns the next message to be sent, regardless of the target peerID.
+// It returns it as a Message object, containing the target peerID.
 func (p *PeerManager) GetNextMessageToSendAll() (Message, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -109,6 +111,8 @@ func (p *PeerManager) GetNextMessageToSendAll() (Message, error) {
 	return ret, nil
 }
 
+// GetNextMessageToSendPeer returns the next message to be sent to a specific peerID.
+// It returns it as a Message object, containing the target peerID.
 func (p *PeerManager) GetNextMessageToSendPeer(peerID string) (Message, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -143,7 +147,9 @@ func (p *PeerManager) GetNextMessageToSendPeer(peerID string) (Message, error) {
 	return nextMsg, nil
 }
 
-// Not appropriate for Adder
+// GetNextMessageToSendPeer returns the next message to be sent to a specific peerID.
+// It returns it as raw bytes, it does NOT contain the target peerID.
+// Note: it is more legacy in this code base, and is not appropriate for Adder.
 func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -175,6 +181,7 @@ func (p *PeerManager) GetNextMessageToSend(peerID string) ([]byte, error) {
 	return nextMsg, nil
 }
 
+// RegisterHandleMessage stores the function that needs to be used to handle an incoming message. This is done in order for PeerManager to be as generic as possible.
 func (p *PeerManager) RegisterHandleMessage(handleFunc func(types.Message) error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -182,10 +189,7 @@ func (p *PeerManager) RegisterHandleMessage(handleFunc func(types.Message) error
 	p.handleMessageFunction = handleFunc
 }
 
+// HandleMessage is the function called by TSS services to handle incoming messages. It uses the function that was previously registered through RegisterHandleMessage()
 func (p *PeerManager) HandleMessage(msg types.Message) error {
 	return p.handleMessageFunction(msg)
 }
-
-// func remove(slice []Message, s int) []Message {
-// 	return append(slice[:s], slice[s+1:]...)
-// }

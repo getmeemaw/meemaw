@@ -21,6 +21,7 @@ type AuthConfig struct {
 	SupabaseApiKey string
 }
 
+// authProviders calls the correct method based on the configured auth provider
 func (server *Server) authProviders(authConfig *AuthConfig, bearerToken string) (string, error) {
 	if authConfig.AuthType == "supabase" {
 		if len(authConfig.SupabaseApiKey) == 0 || len(authConfig.SupabaseUrl) == 0 {

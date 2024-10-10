@@ -16,6 +16,16 @@ import (
 	"nhooyr.io/websocket/wsjson"
 )
 
+/////////
+//
+// client/tss_add.go manages multi-device operations from the client side through two complex functions: RegisterDevice and AcceptDevice.
+// The multi-device process needs to be initiated by a new device by using RegisterDevice, then accepted by an existing device by using AcceptDevice.
+// The way it works is through a TSS process between 3 actors: new device, existing device, server.
+//
+// client/tss_add.go also manages backups, as it uses the two multi-device functions as building blocks: the combination of RegisterDevice & AcceptDevice can be used to create backups or recover from backups.
+//
+/////////
+
 // UPDATE DESCRIPTION
 func RegisterDevice(host, authData, device string) (*tss.DkgResult, string, error) {
 	// Get temporary access token from server based on auth data

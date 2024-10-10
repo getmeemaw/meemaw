@@ -17,7 +17,7 @@ import (
 
 // SignHandler performs the signing process from the server side
 // goes through the authMiddleware to confirm the access token and get the userId
-// requires a hex-encoded message to be signed (provided in URL parameter)
+// requires a hex-encoded message to be signed (provided as URL parameter)
 func (server *Server) SignHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)

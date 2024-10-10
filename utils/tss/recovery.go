@@ -13,8 +13,9 @@ import (
 )
 
 // THIS IS A COPY OF recover_private_key_test.go FROM getamis/alice
-// The fields of RecoveryPeer are not exported, which makes it impossible to query RecoverPrivateKey
-// There doesn't seem to be a constructor either
+// Reasons for duplicate:
+// - The fields of RecoveryPeer in the library are not exported, which makes it impossible to query RecoverPrivateKey.
+// - There doesn't seem to be a constructor either
 // => todo : pull request in getamis/alice to export the fields or add a constructor
 
 var (
