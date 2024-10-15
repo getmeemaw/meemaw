@@ -140,6 +140,8 @@ func (server *Server) Start() {
 
 type Config struct {
 	DevMode         bool
+	Export          bool
+	MultiDevice     bool
 	Port            int
 	DbConnectionUrl string
 	ClientOrigin    string

@@ -14,6 +14,12 @@ import (
 // NOTE - potential improvement for the future: asymmetric encryption of the server shares based on a public encryption key shared by the client, to avoid MITM attack vectors. However, avoid making the wasm file heavier.
 func (server *Server) ExportHandler(w http.ResponseWriter, r *http.Request) {
 
+	if !server._config.Export {
+		log.Println("ExportHandler - config disables export")
+		http.Error(w, "Export unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {

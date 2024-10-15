@@ -33,6 +33,13 @@ type PublicWallet struct {
 
 // RegisterDeviceHandler is called by a new device wanting to "join" the wallet by creating a new share for itself, in collaboration with existing peers
 func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Request) {
+
+	if !server._config.MultiDevice {
+		log.Println("RegisterDeviceHandler - config disables multi-device")
+		http.Error(w, "Multi-device unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
@@ -360,6 +367,12 @@ func (server *Server) RegisterDeviceHandler(w http.ResponseWriter, r *http.Reque
 
 // AcceptDeviceHandler is called by a device already part of the TSS wallet. In collaboration with the server and the new device, a new share is created for the new device
 func (server *Server) AcceptDeviceHandler(w http.ResponseWriter, r *http.Request) {
+
+	if !server._config.MultiDevice {
+		log.Println("RegisterDeviceHandler - config disables multi-device")
+		http.Error(w, "Multi-device unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	// Get userId and access token from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)

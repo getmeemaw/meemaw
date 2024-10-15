@@ -122,6 +122,8 @@ func loadConfigFromEnvs() (*server.Config, error) {
 
 	return &server.Config{
 		DevMode:         config.GetEnvAsBool("DEV_MODE", false),
+		Export:          config.GetEnvAsBool("EXPORT", true),
+		MultiDevice:     config.GetEnvAsBool("MULTI_DEVICE", true),
 		Port:            config.GetEnvAsInt("PORT", 9421),
 		DbConnectionUrl: os.Getenv("DB_CONNECTION_URL"), // Required, checked previously
 		ClientOrigin:    os.Getenv("CLIENT_ORIGIN"),
