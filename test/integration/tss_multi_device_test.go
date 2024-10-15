@@ -88,6 +88,7 @@ func multiDeviceTestProcess() error {
 		AuthType:      "custom",
 		ClientOrigin:  "localhost",
 		DevMode:       true,
+		MultiDevice:   true,
 	}
 
 	queries := database.New(db)

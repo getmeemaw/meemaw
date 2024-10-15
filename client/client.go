@@ -27,7 +27,7 @@ import (
 // Identify gets the userId from the server (which then interacts with the auth provider) based on authData (session, access token, etc)
 // Requires authData (to confirm authorization and identify user) and host
 func Identify(host, authData string) (string, error) {
-	return getAuthDataFromServer(host, authData, "", "/identify")
+	return getDataFromServer(host, authData, "", "/identify")
 }
 
 // Dkg performs the full dkg process on the client side
@@ -369,48 +369,62 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 		return "", &types.ErrUnauthorized{}
 	}
 
-	// Prepare query
-	path := "/export?token=" + token
-
-	_host, err := urlToHttp(host)
-	if err != nil {
-		log.Println("Export - error getting ws host:", err)
-		return "", &types.ErrBadRequest{}
-	}
-
 	// Get client share
 	var dkgResult tss.DkgResult
 	err = json.Unmarshal([]byte(dkgResultStr), &dkgResult)
 	if err != nil {
-		log.Println("Export - error unmarshaling signingParameters:", err)
+		log.Println("Export - error unmarshaling client dkgResults:", err)
 		return "", &types.ErrBadRequest{}
 	}
 
-	share := dkgResult.Share
+	clientShare := dkgResult.Share
 	clientPeerID := dkgResult.PeerID
+	publicKey := dkgResult.Pubkey
 
-	// Create the form data
-	formData := url.Values{
-		"share":        {share},
-		"clientPeerID": {clientPeerID},
-	}
+	// Get server share
+	path := "/export?token=" + token
 
-	// Send POST request
-	resp, err := http.PostForm(_host+path, formData)
+	_host, err := urlToHttp(host)
 	if err != nil {
-		fmt.Println("Export - error sending request:", err)
-		return "", &types.ErrBadRequest{}
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("Export - error reading response body:", err)
+		log.Println("Export - error getting host:", err)
 		return "", &types.ErrBadRequest{}
 	}
 
-	return string(body), nil
+	serverDkgResultStr, err := getDataFromServer(_host, "", "", path)
+	if err != nil {
+		log.Println("Export - error querying server share:", err)
+		return "", &types.ErrBadRequest{}
+	}
+
+	var serverDkgResult tss.DkgResult
+	err = json.Unmarshal([]byte(serverDkgResultStr), &serverDkgResult)
+	if err != nil {
+		log.Println("Export - error unmarshaling server dkgResults:", err)
+		return "", &types.ErrBadRequest{}
+	}
+
+	if publicKey != serverDkgResult.Pubkey {
+		log.Println("Export - error: public keys do not match")
+		return "", &types.ErrBadRequest{}
+	}
+
+	// Export private key
+	// Note: BKs need to come from the server, as they are the only ones that are fully complete in the case of multi-device
+	privateKey, err := tss.RecoverPrivateKeyWrapper(clientPeerID, publicKey, serverDkgResult.Share, clientShare, serverDkgResult.BKs)
+	if err != nil {
+		log.Println("Export - error recovering private key:", err)
+		if strings.Contains(err.Error(), "invalid point") {
+			return "", &types.ErrBadRequest{}
+		} else {
+			return "", &types.ErrServerError{}
+		}
+	}
+
+	// Return private key
+	privateKeyBytes := privateKey.D.Bytes()
+	privateKeyStr := hex.EncodeToString(privateKeyBytes)
+
+	return privateKeyStr, nil
 }
 
 //////////////
@@ -418,10 +432,10 @@ func Export(host string, dkgResultStr string, metadata string, authData string) 
 //////////////
 
 func getAccessToken(host, metadata, authData string) (string, error) {
-	return getAuthDataFromServer(host, authData, metadata, "/authorize")
+	return getDataFromServer(host, authData, metadata, "/authorize")
 }
 
-func getAuthDataFromServer(host, authData, metadata, endpoint string) (string, error) {
+func getDataFromServer(host, authData, metadata, endpoint string) (string, error) {
 	_host, err := urlToHttp(host)
 	if err != nil {
 		return "", err
@@ -430,29 +444,31 @@ func getAuthDataFromServer(host, authData, metadata, endpoint string) (string, e
 	// Request access token
 	req, err := http.NewRequest("GET", _host+endpoint, nil)
 	if err != nil {
-		log.Println("getAuthDataFromServer - error while creating new request:", err)
+		log.Println("getDataFromServer - error while creating new request:", err)
 		return "", err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+authData)
+	if len(authData) > 0 {
+		req.Header.Set("Authorization", "Bearer "+authData)
+	}
 	req.Header.Set("M-METADATA", metadata)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Println("getAuthDataFromServer - error while doing request to", endpoint, ":", err)
+		log.Println("getDataFromServer - error while doing request to", endpoint, ":", err)
 		return "", err
 	}
 
 	if resp.StatusCode != 200 {
-		log.Println("getAuthDataFromServer - error while", endpoint, ", status not 200")
-		log.Printf("getAuthDataFromServer - resp:%+v\n", resp)
+		log.Println("getDataFromServer - error while", endpoint, ", status not 200")
+		log.Printf("getDataFromServer - resp:%+v\n", resp)
 		return "", fmt.Errorf(endpoint, " status not 200")
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("getAuthDataFromServer - error while reading response body of", endpoint, ":", err)
+		log.Println("getDataFromServer - error while reading response body of", endpoint, ":", err)
 		return "", err
 	}
 	retValue := string(body)
