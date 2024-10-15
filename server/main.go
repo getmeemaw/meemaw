@@ -81,7 +81,7 @@ func NewServer(vault Vault, config *Config, wasmBinary []byte, logging bool) *Se
 	// TSS operations
 	r.With(server.authMiddleware).Get("/dkg", server.DkgHandler)
 	r.With(server.authMiddleware).Get("/sign", server.SignHandler)
-	r.With(server.authMiddleware).Post("/export", server.ExportHandler)          // export private key
+	r.With(server.authMiddleware).Get("/export", server.ExportHandler)           // export private key
 	r.With(server.authMiddleware).Get("/register", server.RegisterDeviceHandler) // multi-device
 	r.With(server.authMiddleware).Get("/accept", server.AcceptDeviceHandler)     // multi-device
 

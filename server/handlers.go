@@ -73,7 +73,7 @@ func (server *Server) IdentifyHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
-		log.Println("Authorization info not found")
+		log.Println("IdentifyHandler - userId not found in context")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
@@ -94,6 +94,7 @@ func (server *Server) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// Get userId from context
 	userId, ok := r.Context().Value(types.ContextKey("userId")).(string)
 	if !ok {
+		log.Println("AuthorizeHandler - userId not found in context")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}
@@ -101,6 +102,7 @@ func (server *Server) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// Get metadata from context
 	metadata, ok := r.Context().Value(types.ContextKey("metadata")).(string)
 	if !ok {
+		log.Println("AuthorizeHandler - metadata not found in context")
 		http.Error(w, "Authorization info not found", http.StatusUnauthorized)
 		return
 	}

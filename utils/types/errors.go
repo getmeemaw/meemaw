@@ -24,6 +24,12 @@ func (err *ErrBadRequest) Error() string {
 	return "bad request"
 }
 
+type ErrServerError struct{}
+
+func (err *ErrServerError) Error() string {
+	return "internal server error"
+}
+
 type ErrTssProcessFailed struct{}
 
 func (err *ErrTssProcessFailed) Error() string {
